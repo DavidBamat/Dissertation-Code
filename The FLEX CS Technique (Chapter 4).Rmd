@@ -1,0 +1,3140 @@
+---
+title: "Chapter 4.3 Script for FLEX CS"
+author: "David B"
+output: html_document
+---
+
+### Install/Load packages
+```{r, message=FALSE, warning=FALSE}
+if(!require(tidyverse)) install.packages("tidyverse", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(mice)) install.packages("mice", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(matrixStats)) install.packages("matrixStats", 
+                                           repos = "http://cran.us.r-project.org")
+if(!require(olsrr)) install.packages("olsrr", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(EdSurvey)) install.packages("EdSurvey", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(sae)) install.packages("sae", 
+                                         repos = "http://cran.us.r-project.org")
+```
+
+Import test sample (& some data manipulation)
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+df <- read_csv("[filepath]/TestSampleAchievement.csv")
+
+#Change variable name of "2+" for compatibility with mice function
+df <- rename(df, "TP" = "2+")
+
+#Remove state variable (column)
+df_mice <- df[, -1]
+
+```
+
+**Define (NEW) Visiting Sequence (based on the 3 reduced imputation models below)**
+
+BA ~ I + HS + SBA + W + NEL + M + F
+SBA ~ E + HS + BA + NEL + NSWD + M + F
+HS ~ E + SBA + BA + NEL + NSWD + M + F 
+
+Note, these are the only subgroups of interest that meet the specified criteria for computing MICE subestimates.
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+vis <- c("BA", "SBA", "HS")
+
+```
+
+**Construct Predictor Matrix**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+for_pred_matrix <- mice(df_mice, maxit = 0, print=F) #Enables creation a predictor matrix, which will be subsequently edited
+pred_matrix <- for_pred_matrix$pred #Creates an initial data matrix with 0s along the diagonal and 1s everywhere else
+
+#Next sets of code remove 1s where I do not want corresponding columns to predict rows
+
+pred_matrix[1:3, ] <- 0
+pred_matrix[7:18, ] <- 0
+#these lines assign 0s to columns for rows (subgroups) that won't be imputed (all but HS, SBA, BA)
+
+pred_matrix[4, 2:3] <- 0
+pred_matrix[4, 7:13] <- 0
+pred_matrix[4, 15] <- 0
+#These lines assign 0s to select columns in the HS row (all but E + SBA + BA + NEL + NSWD + M + F)
+
+pred_matrix[5, 2:3] <- 0
+pred_matrix[5, 7:13] <- 0
+pred_matrix[5, 15] <- 0
+#These lines assign 0s to select columns in the SBA row (all but E + HS + BA + NEL + NSWD + M + F)
+
+pred_matrix[6, 1] <- 0
+pred_matrix[6, 3] <- 0
+pred_matrix[6, 8:13] <- 0
+pred_matrix[6, 15:16] <- 0
+#These lines assign 0s to select columns in the BA row (all but I + HS + SBA + W + NEL + M + F)
+
+```
+
+**HS**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#First for the HS variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 4] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+HS_results <- lapply(1:length(df_mice$HS), mice_procedure)
+
+```
+
+**Organize results for HS and compute mean and variance**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+
+HS_results_df <- HS_results[[1]][["imp"]][["HS"]] %>%
+  slice(1:2) %>% 
+  rbind(HS_results[[3]][["imp"]][["HS"]]) %>%
+  slice(-3, -5) %>%
+  rbind(HS_results[[4]][["imp"]][["HS"]]) %>%
+  slice(-4, -6) %>%
+  rbind(HS_results[[5]][["imp"]][["HS"]]) %>%
+  slice(-5, -7) %>%
+  rbind(HS_results[[6]][["imp"]][["HS"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(HS_results[[7]][["imp"]][["HS"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(HS_results[[8]][["imp"]][["HS"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(HS_results[[9]][["imp"]][["HS"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(HS_results[[10]][["imp"]][["HS"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(HS_results[[11]][["imp"]][["HS"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(HS_results[[12]][["imp"]][["HS"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(HS_results[[13]][["imp"]][["HS"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(HS_results[[14]][["imp"]][["HS"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(HS_results[[15]][["imp"]][["HS"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(HS_results[[16]][["imp"]][["HS"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(HS_results[[17]][["imp"]][["HS"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(HS_results[[18]][["imp"]][["HS"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(HS_results[[19]][["imp"]][["HS"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(HS_results[[20]][["imp"]][["HS"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(HS_results[[21]][["imp"]][["HS"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(HS_results[[22]][["imp"]][["HS"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(HS_results[[23]][["imp"]][["HS"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(HS_results[[24]][["imp"]][["HS"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(HS_results[[25]][["imp"]][["HS"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(HS_results[[26]][["imp"]][["HS"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(HS_results[[27]][["imp"]][["HS"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(HS_results[[28]][["imp"]][["HS"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(HS_results[[29]][["imp"]][["HS"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(HS_results[[30]][["imp"]][["HS"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(HS_results[[31]][["imp"]][["HS"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(HS_results[[32]][["imp"]][["HS"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(HS_results[[33]][["imp"]][["HS"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(HS_results[[34]][["imp"]][["HS"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(HS_results[[35]][["imp"]][["HS"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(HS_results[[36]][["imp"]][["HS"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(HS_results[[37]][["imp"]][["HS"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(HS_results[[38]][["imp"]][["HS"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(HS_results[[39]][["imp"]][["HS"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(HS_results[[40]][["imp"]][["HS"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(HS_results[[41]][["imp"]][["HS"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(HS_results[[42]][["imp"]][["HS"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(HS_results[[43]][["imp"]][["HS"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(HS_results[[45]][["imp"]][["HS"]]) %>%
+  slice(-44) %>%
+  rbind(HS_results[[46]][["imp"]][["HS"]]) %>%
+  slice(-46, -47) %>%
+  rbind(HS_results[[47]][["imp"]][["HS"]]) %>%
+  slice(-47, -48) %>%
+  rbind(HS_results[[48]][["imp"]][["HS"]]) %>%
+  slice(-48, -49) %>%
+  rbind(HS_results[[49]][["imp"]][["HS"]]) %>%
+  slice(-49, -50) %>%
+  rbind(HS_results[[50]][["imp"]][["HS"]]) %>%
+  slice(-50, -51)
+
+  HS_results_df <- mutate(HS_results_df, mean = rowMeans(HS_results_df), 
+         se = rowSds(as.matrix(HS_results_df)))
+
+#Save results to computer a .csv
+write.csv(HS_results_df, "[filepath]/HS-MICE-SUBESTIMATE-Results.csv")
+  
+```
+
+**SBA**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#Now for the SBA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 5] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+SBA_results <- lapply(1:length(df_mice$SBA), mice_procedure)
+
+```
+
+**Organize results for SBA and compute mean and variance**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+SBA_results_df <- SBA_results[[1]][["imp"]][["SBA"]] %>%
+  slice(1:2) %>% 
+  rbind(SBA_results[[3]][["imp"]][["SBA"]]) %>%
+  slice(-3, -5) %>%
+  rbind(SBA_results[[4]][["imp"]][["SBA"]]) %>%
+  slice(-4, -6) %>%
+  rbind(SBA_results[[5]][["imp"]][["SBA"]]) %>%
+  slice(-5, -7) %>%
+  rbind(SBA_results[[6]][["imp"]][["SBA"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(SBA_results[[7]][["imp"]][["SBA"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(SBA_results[[8]][["imp"]][["SBA"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(SBA_results[[9]][["imp"]][["SBA"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(SBA_results[[10]][["imp"]][["SBA"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(SBA_results[[11]][["imp"]][["SBA"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(SBA_results[[12]][["imp"]][["SBA"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(SBA_results[[13]][["imp"]][["SBA"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(SBA_results[[14]][["imp"]][["SBA"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(SBA_results[[15]][["imp"]][["SBA"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(SBA_results[[16]][["imp"]][["SBA"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(SBA_results[[17]][["imp"]][["SBA"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(SBA_results[[18]][["imp"]][["SBA"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(SBA_results[[19]][["imp"]][["SBA"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(SBA_results[[20]][["imp"]][["SBA"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(SBA_results[[21]][["imp"]][["SBA"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(SBA_results[[22]][["imp"]][["SBA"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(SBA_results[[23]][["imp"]][["SBA"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(SBA_results[[24]][["imp"]][["SBA"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(SBA_results[[25]][["imp"]][["SBA"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(SBA_results[[26]][["imp"]][["SBA"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(SBA_results[[27]][["imp"]][["SBA"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(SBA_results[[28]][["imp"]][["SBA"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(SBA_results[[29]][["imp"]][["SBA"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(SBA_results[[30]][["imp"]][["SBA"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(SBA_results[[31]][["imp"]][["SBA"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(SBA_results[[32]][["imp"]][["SBA"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(SBA_results[[33]][["imp"]][["SBA"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(SBA_results[[34]][["imp"]][["SBA"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(SBA_results[[35]][["imp"]][["SBA"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(SBA_results[[36]][["imp"]][["SBA"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(SBA_results[[37]][["imp"]][["SBA"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(SBA_results[[38]][["imp"]][["SBA"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(SBA_results[[39]][["imp"]][["SBA"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(SBA_results[[40]][["imp"]][["SBA"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(SBA_results[[41]][["imp"]][["SBA"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(SBA_results[[42]][["imp"]][["SBA"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(SBA_results[[43]][["imp"]][["SBA"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(SBA_results[[45]][["imp"]][["SBA"]]) %>%
+  slice(-44) %>%
+  rbind(SBA_results[[46]][["imp"]][["SBA"]]) %>%
+  slice(-46, -47) %>%
+  rbind(SBA_results[[47]][["imp"]][["SBA"]]) %>%
+  slice(-47, -48) %>%
+  rbind(SBA_results[[48]][["imp"]][["SBA"]]) %>%
+  slice(-48, -49) %>%
+  rbind(SBA_results[[49]][["imp"]][["SBA"]]) %>%
+  slice(-49, -50) %>%
+  rbind(SBA_results[[50]][["imp"]][["SBA"]]) %>%
+  slice(-50, -51)
+
+SBA_results_df <- mutate(SBA_results_df, mean = rowMeans(SBA_results_df), 
+         se = rowSds(as.matrix(SBA_results_df)))
+
+#Save results to computer a .csv
+write.csv(SBA_results_df, "[filepath]/SBA-MICE-SUBESTIMATE-Results.csv")
+
+```
+
+**BA**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#Now for the BA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 6] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+BA_results <- lapply(1:length(df_mice$BA), mice_procedure)
+
+```
+
+**Organize results for BA and compute mean and variance**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+BA_results_df <- BA_results[[1]][["imp"]][["BA"]] %>%
+  slice(1:2) %>% 
+  rbind(BA_results[[3]][["imp"]][["BA"]]) %>%
+  slice(-3, -5) %>%
+  rbind(BA_results[[4]][["imp"]][["BA"]]) %>%
+  slice(-4, -6) %>%
+  rbind(BA_results[[5]][["imp"]][["BA"]]) %>%
+  slice(-5, -7) %>%
+  rbind(BA_results[[6]][["imp"]][["BA"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(BA_results[[7]][["imp"]][["BA"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(BA_results[[8]][["imp"]][["BA"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(BA_results[[9]][["imp"]][["BA"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(BA_results[[10]][["imp"]][["BA"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(BA_results[[11]][["imp"]][["BA"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(BA_results[[12]][["imp"]][["BA"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(BA_results[[13]][["imp"]][["BA"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(BA_results[[14]][["imp"]][["BA"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(BA_results[[15]][["imp"]][["BA"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(BA_results[[16]][["imp"]][["BA"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(BA_results[[17]][["imp"]][["BA"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(BA_results[[18]][["imp"]][["BA"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(BA_results[[19]][["imp"]][["BA"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(BA_results[[20]][["imp"]][["BA"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(BA_results[[21]][["imp"]][["BA"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(BA_results[[22]][["imp"]][["BA"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(BA_results[[23]][["imp"]][["BA"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(BA_results[[24]][["imp"]][["BA"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(BA_results[[25]][["imp"]][["BA"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(BA_results[[26]][["imp"]][["BA"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(BA_results[[27]][["imp"]][["BA"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(BA_results[[28]][["imp"]][["BA"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(BA_results[[29]][["imp"]][["BA"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(BA_results[[30]][["imp"]][["BA"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(BA_results[[31]][["imp"]][["BA"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(BA_results[[32]][["imp"]][["BA"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(BA_results[[33]][["imp"]][["BA"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(BA_results[[34]][["imp"]][["BA"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(BA_results[[35]][["imp"]][["BA"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(BA_results[[36]][["imp"]][["BA"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(BA_results[[37]][["imp"]][["BA"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(BA_results[[38]][["imp"]][["BA"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(BA_results[[39]][["imp"]][["BA"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(BA_results[[40]][["imp"]][["BA"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(BA_results[[41]][["imp"]][["BA"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(BA_results[[42]][["imp"]][["BA"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(BA_results[[43]][["imp"]][["BA"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(BA_results[[45]][["imp"]][["BA"]]) %>%
+  slice(-44) %>%
+  rbind(BA_results[[46]][["imp"]][["BA"]]) %>%
+  slice(-46, -47) %>%
+  rbind(BA_results[[47]][["imp"]][["BA"]]) %>%
+  slice(-47, -48) %>%
+  rbind(BA_results[[48]][["imp"]][["BA"]]) %>%
+  slice(-48, -49) %>%
+  rbind(BA_results[[49]][["imp"]][["BA"]]) %>%
+  slice(-49, -50) %>%
+  rbind(BA_results[[50]][["imp"]][["BA"]]) %>%
+  slice(-50, -51)
+
+BA_results_df <- mutate(BA_results_df, mean = rowMeans(BA_results_df), 
+         se = rowSds(as.matrix(BA_results_df)))
+
+#Save results to computer as a .csv
+write.csv(BA_results_df, "[filepath]/BA-MICE-SUBESTIMATE-Results.csv")
+
+```
+
+**NB**: MICE subsestimates have been computed for HS, SBA and BA
+
+**Free up memory**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+rm(list = ls())
+```
+
+
+### FH subestimates
+
+**First figure out which combinations of predictors per subgroup of interest yield the largest r-squared statistic.**
+
+Merge NAEP-reported estimates of mean math achievement and state-level predictors
+```{r, message=FALSE, warning=FALSE}
+
+NR_TV_Mean_SE <- read_csv("[filepath]/NR_TV_Mean_SE.csv")
+PREDICTORS_DF <- read_csv("[filepath]/PREDICTORS-DF.csv")
+NR_STATEPRED_DF <- full_join(NR_TV_Mean_SE, PREDICTORS_DF, by="State")
+
+#Define variables as numeric (except for the first one)
+
+NR_STATEPRED_DF[,2:30] <- apply(NR_STATEPRED_DF[,2:30], 2, as.numeric)
+NR_STATEPRED_DF <- as.data.frame(NR_STATEPRED_DF)
+
+```
+
+NHS
+```{r, message=FALSE, warning=FALSE}
+
+NHS_model <- lm(NR_NHS_Mean ~ B_H_AINA + FER + p_EL + SQI, data = NR_STATEPRED_DF)
+ols_step_all_possible(NHS_model)
+
+#select predictors: FER p_EL
+
+```
+
+HS
+```{r, message=FALSE, warning=FALSE}
+
+HS_model <- lm(NR_HS_Mean ~ B_H_AINA + FER + p_EL + SQI, data = NR_STATEPRED_DF)
+ols_step_all_possible(HS_model)
+
+#select predictors: B_H_AINA p_EL SQI
+
+```
+
+SBA
+```{r, message=FALSE, warning=FALSE}
+
+SBA_model <- lm(NR_SBA_Mean ~ B_H_AINA + FER + p_EL + SQI, data = NR_STATEPRED_DF)
+ols_step_all_possible(SBA_model)
+
+#select predictors: B_H_AINA FER p_EL
+
+```
+
+BA
+```{r, message=FALSE, warning=FALSE}
+
+BA_model <- lm(NR_BA_Mean ~ B_H_AINA + FER + p_EL + SQI, data = NR_STATEPRED_DF)
+ols_step_all_possible(BA_model)
+
+#select predictors: B_H_AINA FER p_EL
+
+```
+
+B
+```{r, message=FALSE, warning=FALSE}
+
+B_model <- lm(NR_B_Mean ~ p_BA + FER + SQI + AA, data = NR_STATEPRED_DF)
+ols_step_all_possible(B_model)
+
+#select predictors: p_BA SQI AA
+
+```
+
+H
+```{r, message=FALSE, warning=FALSE}
+
+H_model <- lm(NR_H_Mean ~ p_BA + FER + p_EL + SQI + MX, data = NR_STATEPRED_DF)
+ols_step_all_possible(H_model)
+
+#select predictors: SQI MX
+
+```
+
+
+API
+```{r, message=FALSE, warning=FALSE}
+
+API_model <- lm(NR_API_Mean ~ p_BA + FER + p_EL + SQI + A, data = NR_STATEPRED_DF)
+ols_step_all_possible(API_model)
+
+#select predictors: p_BA p_EL SQI A
+
+```
+
+
+
+AINA
+```{r, message=FALSE, warning=FALSE}
+
+AINA_model <- lm(NR_AINA_Mean ~ p_BA + FER, data = NR_STATEPRED_DF)
+ols_step_all_possible(AINA_model)
+
+#select predictors: FER
+
+```
+
+TP
+```{r, message=FALSE, warning=FALSE}
+
+TP_model <- lm(NR_TP_Mean ~ p_BA + B_H_AINA + FER + SQI, data = NR_STATEPRED_DF)
+ols_step_all_possible(TP_model)
+
+#select predictors: p_BA B_H_AINA FER SQI
+
+```
+
+EL
+```{r, message=FALSE, warning=FALSE}
+
+EL_model <- lm(NR_EL_Mean ~ B_H_AINA + FER + SQI, data = NR_STATEPRED_DF)
+ols_step_all_possible(EL_model)
+
+#select predictors: FER SQI
+
+```
+
+**Free up memory**
+```{r warning=FALSE, message=FALSE}
+rm(list = ls())
+```
+
+**Execute FH procedure**
+
+First import the FH_df data file that was previously used for the FH approach
+```{r, message=FALSE, warning=FALSE}
+
+FH_df <- read_csv("[filepath]/FH-DF.csv")
+FH_df <- FH_df[,-1]
+
+```
+
+NHS
+```{r warning=FALSE, message=FALSE}
+
+options(digits = 5)
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 30] <- FH_df1[x, 2] #30 corresponds with NR_NHS_Mean, 2 with NHS_direct_est
+	FH_df1[x, 31] <- FH_df1[x, 3] #31 corresponds with NR_NHS_SE, 3 with NHS_se
+	FH_df1 <- filter(FH_df1, NR_NHS_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_NHS_Mean ~ FER + p_EL, NR_NHS_SE^2) #line changes per subgroup
+}
+
+NHS_FH_results <- lapply(1:length(FH_df$NR_NHS_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from NHS_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  NHS_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+NHS_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+NHS_eblups <- t(as.data.frame(NHS_eblups))
+rownames(NHS_eblups) <- c()
+NHS_eblups <- as.data.frame(NHS_eblups)
+names(NHS_eblups) <- c("NHS eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  NHS_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+NHS_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+NHS_eblup_se <- t(as.data.frame(NHS_eblup_se))
+rownames(NHS_eblup_se) <- c()
+NHS_eblup_se <- as.data.frame(NHS_eblup_se)
+names(NHS_eblup_se) <- c("NHS_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+NHS_NR <- 
+  read_csv("[filepath]/NHS.csv") %>%
+  filter(Mean != "NA")
+NHS_FH_results <- cbind(NHS_NR$State, NHS_eblups, NHS_eblup_se)
+names(NHS_FH_results) <- c("State", "NHS_eblups", "NHS_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+NHS_FH_results$NHS_eblup_se <- sqrt(NHS_FH_results$NHS_eblup_se)
+
+```
+
+HS
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 32] <- FH_df1[x, 4] #32 corresponds with NR_HS_Mean, 4 with HS_direct_est
+	FH_df1[x, 33] <- FH_df1[x, 5] #33 corresponds with NR_HS_SE, 5 with HS_se
+	FH_df1 <- filter(FH_df1, NR_HS_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_HS_Mean ~ B_H_AINA + FER + SQI, NR_HS_SE^2) #line changes per subgroup
+}
+
+HS_FH_results <- lapply(1:length(FH_df$NR_HS_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from HS_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  HS_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+HS_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+HS_eblups <- t(as.data.frame(HS_eblups))
+rownames(HS_eblups) <- c()
+HS_eblups <- as.data.frame(HS_eblups)
+names(HS_eblups) <- c("HS eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  HS_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+HS_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+HS_eblup_se <- t(as.data.frame(HS_eblup_se))
+rownames(HS_eblup_se) <- c()
+HS_eblup_se <- as.data.frame(HS_eblup_se)
+names(HS_eblup_se) <- c("HS_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+HS_NR <- 
+  read_csv("[filepath]/HS.csv") %>%
+  filter(Mean != "NA")
+HS_FH_results <- cbind(HS_NR$State, HS_eblups, HS_eblup_se)
+names(HS_FH_results) <- c("State", "HS_eblups", "HS_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+HS_FH_results$HS_eblup_se <- sqrt(HS_FH_results$HS_eblup_se)
+```
+
+SBA
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 34] <- FH_df1[x, 6] #34 corresponds with NR_SBA_Mean, 6 with SBA_direct_est
+	FH_df1[x, 35] <- FH_df1[x, 7] #35 corresponds with NR_SBA_SE, 7 with SBA_se
+	FH_df1 <- filter(FH_df1, NR_SBA_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_SBA_Mean ~ B_H_AINA + FER + p_EL, NR_SBA_SE^2) #line changes per subgroup
+}
+
+SBA_FH_results <- lapply(1:length(FH_df$NR_SBA_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from SBA_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  SBA_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+SBA_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+SBA_eblups <- t(as.data.frame(SBA_eblups))
+rownames(SBA_eblups) <- c()
+SBA_eblups <- as.data.frame(SBA_eblups)
+names(SBA_eblups) <- c("SBA eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  SBA_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+SBA_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+SBA_eblup_se <- t(as.data.frame(SBA_eblup_se))
+rownames(SBA_eblup_se) <- c()
+SBA_eblup_se <- as.data.frame(SBA_eblup_se)
+names(SBA_eblup_se) <- c("SBA_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+SBA_NR <- 
+  read_csv("[filepath]/SBA.csv") %>%
+  filter(Mean != "NA")
+SBA_FH_results <- cbind(SBA_NR$State, SBA_eblups, SBA_eblup_se)
+names(SBA_FH_results) <- c("State", "SBA_eblups", "SBA_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+SBA_FH_results$SBA_eblup_se <- sqrt(SBA_FH_results$SBA_eblup_se)
+
+```
+
+BA
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 36] <- FH_df1[x, 8] #36 corresponds with NR_BA_Mean, 8 with BA_direct_est
+	FH_df1[x, 37] <- FH_df1[x, 9] #37 corresponds with NR_BA_SE, 9 with BA_se
+	FH_df1 <- filter(FH_df1, NR_BA_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_BA_Mean ~ B_H_AINA + FER + p_EL, NR_BA_SE^2) #line changes per subgroup
+}
+
+BA_FH_results <- lapply(1:length(FH_df$NR_BA_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from BA_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  BA_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+BA_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+BA_eblups <- t(as.data.frame(BA_eblups))
+rownames(BA_eblups) <- c()
+BA_eblups <- as.data.frame(BA_eblups)
+names(BA_eblups) <- c("BA eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  BA_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+BA_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+BA_eblup_se <- t(as.data.frame(BA_eblup_se))
+rownames(BA_eblup_se) <- c()
+BA_eblup_se <- as.data.frame(BA_eblup_se)
+names(BA_eblup_se) <- c("BA_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+BA_NR <- 
+  read_csv("[filepath]/BA.csv") %>%
+  filter(Mean != "NA")
+BA_FH_results <- cbind(BA_NR$State, BA_eblups, BA_eblup_se)
+names(BA_FH_results) <- c("State", "BA_eblups", "BA_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+BA_FH_results$BA_eblup_se <- sqrt(BA_FH_results$BA_eblup_se)
+
+```
+
+B
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 38] <- FH_df1[x, 10] #38 corresponds with NR_B_Mean, 10 with B_direct_est
+	FH_df1[x, 39] <- FH_df1[x, 11] #39 corresponds with NR_B_SE, 11 with B_se
+	FH_df1 <- filter(FH_df1, NR_B_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_B_Mean ~ p_BA + SQI + AA, NR_B_SE^2) #line changes per subgroup
+}
+
+B_FH_results <- lapply(1:length(FH_df$NR_B_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from B_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  B_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+B_eblups <- lapply(1:39, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+B_eblups <- t(as.data.frame(B_eblups))
+rownames(B_eblups) <- c()
+B_eblups <- as.data.frame(B_eblups)
+names(B_eblups) <- c("B eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  B_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+B_eblup_se <- lapply(1:39, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+B_eblup_se <- t(as.data.frame(B_eblup_se))
+rownames(B_eblup_se) <- c()
+B_eblup_se <- as.data.frame(B_eblup_se)
+names(B_eblup_se) <- c("B_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+B_NR <- 
+  read_csv("[filepath]/B.csv") %>%
+  filter(Mean != "NA")
+B_FH_results <- cbind(B_NR$State, B_eblups, B_eblup_se)
+names(B_FH_results) <- c("State", "B_eblups", "B_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+B_FH_results$B_eblup_se <- sqrt(B_FH_results$B_eblup_se)
+
+```
+
+
+H 
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 40] <- FH_df1[x, 12] #40 corresponds with NR_H_Mean, 12 with H_direct_est
+	FH_df1[x, 41] <- FH_df1[x, 13] #41 corresponds with NR_H_SE, 13 with H_se
+	FH_df1 <- filter(FH_df1, NR_H_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_H_Mean ~ SQI + MX, NR_H_SE^2) #line changes per subgroup
+}
+
+H_FH_results <- lapply(1:length(FH_df$NR_H_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from H_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  H_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+H_eblups <- lapply(1:47, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+H_eblups <- t(as.data.frame(H_eblups))
+rownames(H_eblups) <- c()
+H_eblups <- as.data.frame(H_eblups)
+names(H_eblups) <- c("H eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  H_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+H_eblup_se <- lapply(1:47, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+H_eblup_se <- t(as.data.frame(H_eblup_se))
+rownames(H_eblup_se) <- c()
+H_eblup_se <- as.data.frame(H_eblup_se)
+names(H_eblup_se) <- c("H_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+H_NR <- 
+  read_csv("[filepath]/H.csv") %>%
+  filter(Mean != "NA")
+H_FH_results <- cbind(H_NR$State, H_eblups, H_eblup_se)
+names(H_FH_results) <- c("State", "H_eblups", "H_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+H_FH_results$H_eblup_se <- sqrt(H_FH_results$H_eblup_se)
+
+```
+
+API 
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 42] <- FH_df1[x, 14] #42 corresponds with NR_API_Mean, 14 with API_direct_est
+	FH_df1[x, 43] <- FH_df1[x, 15] #43 corresponds with NR_API_SE, 15 with API_se
+	FH_df1 <- filter(FH_df1, NR_API_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_API_Mean ~ p_BA + p_EL + SQI + A, NR_API_SE^2) #line changes per subgroup
+}
+
+API_FH_results <- lapply(1:length(FH_df$NR_API_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from API_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  API_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+API_eblups <- lapply(1:30, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+API_eblups <- t(as.data.frame(API_eblups))
+rownames(API_eblups) <- c()
+API_eblups <- as.data.frame(API_eblups)
+names(API_eblups) <- c("API eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  API_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+API_eblup_se <- lapply(1:30, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+API_eblup_se <- t(as.data.frame(API_eblup_se))
+rownames(API_eblup_se) <- c()
+API_eblup_se <- as.data.frame(API_eblup_se)
+names(API_eblup_se) <- c("API_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+API_NR <- 
+  read_csv("[filepath]/API.csv") %>%
+  filter(Mean != "NA")
+API_FH_results <- cbind(API_NR$State, API_eblups, API_eblup_se)
+names(API_FH_results) <- c("State", "API_eblups", "API_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+API_FH_results$API_eblup_se <- sqrt(API_FH_results$API_eblup_se)
+
+```
+
+AINA
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 44] <- FH_df1[x, 16] #44 corresponds with NR_AINA_Mean, 16 with AINA_direct_est
+	FH_df1[x, 45] <- FH_df1[x, 17] #45 corresponds with NR_AINA_SE, 17 with AINA_se
+	FH_df1 <- filter(FH_df1, NR_AINA_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_AINA_Mean ~ FER, NR_AINA_SE^2) #line changes per subgroup
+}
+
+AINA_FH_results <- lapply(1:length(FH_df$NR_AINA_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from AINA_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  AINA_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+AINA_eblups <- lapply(1:13, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+AINA_eblups <- t(as.data.frame(AINA_eblups))
+rownames(AINA_eblups) <- c()
+AINA_eblups <- as.data.frame(AINA_eblups)
+names(AINA_eblups) <- c("AINA eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  AINA_FH_results[[x]]$mse[x]
+}
+
+
+
+
+#Automate with lapply
+AINA_eblup_se <- lapply(1:13, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+AINA_eblup_se <- t(as.data.frame(AINA_eblup_se))
+rownames(AINA_eblup_se) <- c()
+AINA_eblup_se <- as.data.frame(AINA_eblup_se)
+names(AINA_eblup_se) <- c("AINA_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+AINA_NR <- 
+  read_csv("[filepath]/AINA.csv") %>%
+  filter(Mean != "NA")
+AINA_FH_results <- cbind(AINA_NR$State, AINA_eblups, AINA_eblup_se)
+names(AINA_FH_results) <- c("State", "AINA_eblups", "AINA_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+AINA_FH_results$AINA_eblup_se <- sqrt(AINA_FH_results$AINA_eblup_se)
+
+```
+
+TP
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 46] <- FH_df1[x, 18] #46 corresponds with NR_TP_Mean, 18 with TP_direct_est
+	FH_df1[x, 47] <- FH_df1[x, 19] #47 corresponds with NR_TP_SE, 19 with TP_se
+	FH_df1 <- filter(FH_df1, NR_TP_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_TP_Mean ~ p_BA + B_H_AINA + FER + SQI, NR_TP_SE^2) #line changes per subgroup
+}
+
+TP_FH_results <- lapply(1:length(FH_df$NR_TP_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from TP_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  TP_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+TP_eblups <- lapply(1:24, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+TP_eblups <- t(as.data.frame(TP_eblups))
+rownames(TP_eblups) <- c()
+TP_eblups <- as.data.frame(TP_eblups)
+names(TP_eblups) <- c("TP eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  TP_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+TP_eblup_se <- lapply(1:24, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+TP_eblup_se <- t(as.data.frame(TP_eblup_se))
+rownames(TP_eblup_se) <- c()
+TP_eblup_se <- as.data.frame(TP_eblup_se)
+names(TP_eblup_se) <- c("TP_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+TP_NR <- 
+  read_csv("[filepath]/2+.csv") %>%
+  filter(Mean != "NA")
+TP_FH_results <- cbind(TP_NR$State, TP_eblups, TP_eblup_se)
+names(TP_FH_results) <- c("State", "TP_eblups", "TP_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+TP_FH_results$TP_eblup_se <- sqrt(TP_FH_results$TP_eblup_se)
+
+```
+
+EL
+```{r warning=FALSE, message=FALSE}
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 48] <- FH_df1[x, 20] #48 corresponds with NR_EL_Mean, 20 with EL_direct_est
+	FH_df1[x, 49] <- FH_df1[x, 21] #49 corresponds with NR_EL_SE, 21 with EL_se
+	FH_df1 <- filter(FH_df1, NR_EL_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_EL_Mean ~ FER + SQI, NR_EL_SE^2) #line changes per subgroup
+}
+
+EL_FH_results <- lapply(1:length(FH_df$NR_EL_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from EL_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  EL_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+EL_eblups <- lapply(1:31, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+EL_eblups <- t(as.data.frame(EL_eblups))
+rownames(EL_eblups) <- c()
+EL_eblups <- as.data.frame(EL_eblups)
+names(EL_eblups) <- c("EL eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  EL_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+EL_eblup_se <- lapply(1:31, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+EL_eblup_se <- t(as.data.frame(EL_eblup_se))
+rownames(EL_eblup_se) <- c()
+EL_eblup_se <- as.data.frame(EL_eblup_se)
+names(EL_eblup_se) <- c("EL_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+EL_NR <- 
+  read_csv("[filepath]/EL.csv") %>%
+  filter(Mean != "NA")
+EL_FH_results <- cbind(EL_NR$State, EL_eblups, EL_eblup_se)
+names(EL_FH_results) <- c("State", "EL_eblups", "EL_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+EL_FH_results$EL_eblup_se <- sqrt(EL_FH_results$EL_eblup_se)
+
+```
+
+
+**Export FH subestimates**
+```{r warning=FALSE, message=FALSE}
+
+#NHS
+write.csv(NHS_FH_results, "[filepath]/NHS-FH-SUBESTIMATES.csv")
+
+#HS
+write.csv(HS_FH_results, "[filepath]/HS-FH-SUBESTIMATES.csv")
+
+#SBA
+write.csv(SBA_FH_results, "[filepath]/SBA-FH-SUBESTIMATES.csv")
+
+#BA
+write.csv(BA_FH_results, "[filepath]/BA-FH-SUBESTIMATES.csv")
+
+#B
+write.csv(B_FH_results, "[filepath]/B-FH-SUBESTIMATES.csv")
+
+#H
+write.csv(H_FH_results, "[filepath]/H-FH-SUBESTIMATES.csv")
+
+#API
+write.csv(API_FH_results, "[filepath]/API-FH-SUBESTIMATES.csv")
+
+#AINA
+write.csv(AINA_FH_results, "[filepath]/AINA-FH-SUBESTIMATES.csv")
+
+#TP
+write.csv(TP_FH_results, "[filepath]/TP-FH-SUBESTIMATES.csv")
+
+#EL
+write.csv(EL_FH_results, "[filepath]/EL-FH-SUBESTIMATES.csv")
+
+```
+
+### WPE subestimates
+
+Import and wrangle data
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+#Import data
+SEDA_geodist_long_NAEP_v21 <- read_csv("[filepath]/SEDA_geodist_long_NAEP_v21")
+
+#rename to simplify
+df <- SEDA_geodist_long_NAEP_v21
+
+#subset
+df <- df %>%
+  filter(grade == 8) %>% 
+  filter(year == 2015) %>%
+  filter(subject == "math") %>%
+  filter(stateabb != "DC")
+
+df <-  dplyr::select(df, leaname, stateabb, totgyb_all, mn_all, sd_all, mn_all_se, sd_all_se, totgyb_asn, mn_asn, sd_asn, mn_asn_se, sd_asn_se, totgyb_blk, mn_blk, sd_blk, mn_blk_se, 
+sd_blk_se, totgyb_hsp, mn_hsp, sd_hsp, mn_hsp_se, sd_hsp_se)
+
+
+#compute total sums into a tibble
+df_sums <- df %>% 
+  group_by(stateabb) %>%
+  summarize(state_total_sum = sum(totgyb_all, na.rm = T))
+
+#NB: There are 35 states that have data for this particular "gyb" (grade8-2015-math)
+
+#merge in the sums for each state
+df <- full_join(df, df_sums, by = "stateabb")
+
+#create total weights
+df <- df %>%
+  mutate(total_weight = totgyb_all/state_total_sum)
+
+```
+
+"asn"
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#compute total asn sums into a tibble
+df_asn_sums <- df %>% 
+  group_by(stateabb) %>%
+  summarize(state_asn_sum = sum(totgyb_asn, na.rm = T))
+
+#merge in the sums for each state
+df <- full_join(df, df_asn_sums, by = "stateabb")
+
+#create asn weights
+df <- df %>%
+  mutate(asn_weight = totgyb_asn/state_asn_sum)
+
+```
+
+
+"blk"
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#compute total blk sums into a tibble
+df_blk_sums <- df %>% 
+  group_by(stateabb) %>%
+  summarize(state_blk_sum = sum(totgyb_blk, na.rm = T))
+
+#merge in the sums for each state
+df <- full_join(df, df_blk_sums, by = "stateabb")
+
+#create blk weights
+df <- df %>%
+  mutate(blk_weight = totgyb_blk/state_blk_sum)
+
+```
+
+"hsp"
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#compute total hsp sums into a tibble
+df_hsp_sums <- df %>% 
+  group_by(stateabb) %>%
+  summarize(state_hsp_sum = sum(totgyb_hsp, na.rm = T))
+
+#merge in the sums for each state
+df <- full_join(df, df_hsp_sums, by = "stateabb")
+
+#create hsp weights
+df <- df %>%
+  mutate(hsp_weight = totgyb_hsp/state_hsp_sum)
+
+```
+
+**Generate WPE means**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#Create variables holding "contributions" of each strata (district)
+df <- df %>%
+  mutate(tot_con = mn_all*total_weight, asn_con = mn_asn*asn_weight,
+         blk_con = mn_blk*blk_weight, hsp_con = mn_hsp*hsp_weight)
+
+#Create tibble for WPE by state across subgroups
+WPE_means <- df %>%
+  group_by(stateabb) %>%
+  summarize(tot_wpe = sum(tot_con, na.rm = T), 
+            asn_wpe = sum(asn_con, na.rm = T),
+            blk_wpe = sum(blk_con, na.rm = T),
+            hsp_wpe = sum(hsp_con, na.rm = T))
+
+```
+
+**Generate WPE variances**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#Create/Add variables to data frame that include the mean variance of achievement for each district across subgroups
+df <- df %>%
+  mutate(tot_mn_var = mn_all_se^2,
+         asn_mn_var = mn_asn_se^2,
+         blk_mn_var = mn_blk_se^2,
+         hsp_mn_var = mn_hsp_se^2)
+
+
+#Create/Add "n-1" variables for each strata (district) across subgroups
+
+df <- df %>%
+  mutate(tot_n1 = totgyb_all-1,
+         asn_n1 = totgyb_asn-1,
+         blk_n1 = totgyb_blk-1,
+         hsp_n1 = totgyb_hsp-1)
+
+#Create tibble for WPE variance by state across subgroups
+
+WPE_variances <- df %>%
+  group_by(stateabb) %>%
+  summarize(tot_var = sum(tot_n1*tot_mn_var, na.rm = T)/sum(tot_n1, na.rm = T),
+            asn_var = sum(asn_n1*asn_mn_var, na.rm = T)/sum(asn_n1, na.rm = T),
+            blk_var = sum(blk_n1*blk_mn_var, na.rm = T)/sum(blk_n1, na.rm = T),
+            hsp_var = sum(hsp_n1*hsp_mn_var, na.rm = T)/sum(hsp_n1, na.rm = T))
+
+
+```
+
+**Merge WPE Means and Variances.**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+WPE_subestimates <- full_join(WPE_means, WPE_variances, by = "stateabb")
+WPE_subestimates <- dplyr::select(WPE_subestimates, -"tot_wpe", -"tot_var")
+
+WPE_subestimates <- WPE_subestimates %>%
+  rename(State = stateabb)
+
+```
+
+**Export WPE subestimates**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+write.csv(WPE_subestimates, "[filepath]/WPE-SUBESTIMATES.csv")
+
+
+```
+
+### NNI subestimates
+
+The Euclidean distance between states is equal to the square root of the sum of squared differences between states’ values on measures of parental level of education (p_BA), family economic resources (FER), race and ethnicity (B_H_AINA) and school quality (SQI). To limit the undue influence of the scale on which the variables’ values are measured, each of the data variables are standardized with a mean of 0 and a standard deviation of 1 so that the distribution of values for each variable are on the same scale.
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#Import predictors
+PREDICTORS_DF <- read_csv("[filepath]/PREDICTORS-DF.csv")
+
+#Reduce dataset to B_H_AINA, FER, p_BA, and SQI
+NNI_df <- dplyr::select(PREDICTORS_DF, B_H_AINA, FER, p_BA, SQI) 
+
+#Standardize variable values
+NNI_df <- apply(NNI_df, 2, scale)
+
+#Make sure NNI_df is a data frame
+NNI_df <- as.data.frame(NNI_df)
+
+#Compute distance matrix
+dist_df <- dist(NNI_df)
+
+#define as data frame
+dist_df <- as.matrix(dist_df)
+dist_df <- as.data.frame(dist_df)
+
+
+#TURNS OUT THERE ARE NO SIBLING STATES (distances of .20 or less)
+
+#Doubling the threshold to less than or equal to .40 produces 5 pairs of "siblings." So 10 (one in five) states would have a sibling and thus an NNI subestimate. Seems like a reasonable proportion from my perspective. And HB (Advisor) agrees.
+#Alabama & Oklahoma (0.25) 
+#Pennsylvania & Wisconsin (0.25)
+#Michigan & Missouri (0.28)
+#Connecticut & New Jersey (0.36)
+#Kansas & Nebraska (0.36)
+#Iowa & North Dakota (0.39)
+```
+
+Import & Wrangle NAEP reported estimates
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+NR_TV_Mean_SE <- read_csv("C[filepath]/NR_TV_Mean_SE.csv")
+
+#Filter on states that have a sibling (according to 0.40 threshold)
+siblings <- c("AL", "OK", "PA", "WI", "MI", "MO", "CT", "NJ", "KS", "NE", "IA", "ND")
+
+siblings_df <- NR_TV_Mean_SE %>%
+  filter(State %in% siblings)
+
+```
+
+Perform NNI substitutions (swaps)
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+#AL/OK (rows 1 and 10)
+siblings_df[1, 1] <- "OK"
+siblings_df[10, 1] <- "AL"
+
+#PA/WI (rows 11 and 12)
+siblings_df[11, 1] <- "WI"
+siblings_df[12, 1] <- "PA"
+
+#MI/MO (rows 5 and 6)
+siblings_df[5, 1] <- "MO" 
+siblings_df[6, 1] <- "MI"
+
+#CT/NJ (rows 2 and 8)
+siblings_df[2, 1] <- "NJ" 
+siblings_df[8, 1] <- "CT"
+
+#KS/NE (rows 4 and 7)
+siblings_df[4, 1] <- "NE" 
+siblings_df[7, 1] <- "KS"
+
+#IA/ND (rows 3 and 9)
+siblings_df[3, 1] <- "ND"
+siblings_df[9, 1] <- "IA"
+
+
+```
+
+**Export NNI subestimates**
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+
+write.csv(siblings_df, "[filepath]/NNI-SUBESTIMATES.csv")
+
+
+```
+
+
+### Wrangle final predicted values and their variance estimates into one data file
+
+**Free up memory**
+```{r warning=FALSE, message=FALSE}
+rm(list = ls())
+```
+
+**Import and merge subestimates**
+
+NHS (Subsestimates: FH, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#FH
+NHS_FH_subs <- read_csv("[filepath]/NHS-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NHS_eblups", "NHS_eblup_se")
+
+#NNI
+NHS_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_NHS_Mean", "NR_NHS_SE")
+
+#merge with #full_join()
+NHS_FLEXCS_DF <- full_join(NHS_FH_subs, NHS_NNI_subs, by = "State")
+
+
+```
+
+HS (Subsestimates: MICE, FH, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#First save abbreviations to an object called "State"
+State <- read_csv("[filepath]/2+.csv")
+State <- State[,1]
+
+#MICE
+HS_MICE_subs <- read_csv("[filepath]/HS-MICE-SUBESTIMATE-Results.csv")
+
+HS_MICE_subs <- cbind(State, HS_MICE_subs)
+
+HS_MICE_subs <- HS_MICE_subs %>%
+  dplyr::select("State", "mean", "se")
+
+HS_MICE_subs[2,2:3] <- NA
+HS_MICE_subs[44,2:3] <- NA
+
+#FH
+HS_FH_subs <- read_csv("[filepath]/HS-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "HS_eblups", "HS_eblup_se")
+
+#NNI
+HS_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_HS_Mean", "NR_HS_SE")
+
+#merge with #full_join()
+HS_FLEXCS_DF <- full_join(HS_MICE_subs, HS_FH_subs, by = "State") %>%
+  full_join(HS_NNI_subs, by = "State")
+
+
+```
+
+SBA (Subsestimates: MICE, FH, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#MICE
+SBA_MICE_subs <- read_csv("[filepath]/SBA-MICE-SUBESTIMATE-Results.csv")
+
+SBA_MICE_subs <- cbind(State, SBA_MICE_subs)
+
+SBA_MICE_subs <- SBA_MICE_subs %>%
+  dplyr::select("State", "mean", "se")
+
+SBA_MICE_subs[2,2:3] <- NA
+SBA_MICE_subs[44,2:3] <- NA
+
+#FH
+SBA_FH_subs <- read_csv("[filepath]/SBA-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "SBA_eblups", "SBA_eblup_se")
+
+#NNI
+SBA_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_SBA_Mean", "NR_SBA_SE")
+
+#merge with #full_join()
+SBA_FLEXCS_DF <- full_join(SBA_MICE_subs, SBA_FH_subs, by = "State") %>%
+  full_join(SBA_NNI_subs, by = "State")
+
+```
+
+BA (Subsestimates: MICE, FH, NNI)
+```{r warning=FALSE, message=FALSE}
+#MICE
+BA_MICE_subs <- read_csv("[filepath]/BA-MICE-SUBESTIMATE-Results.csv")
+
+BA_MICE_subs <- cbind(State, BA_MICE_subs)
+
+BA_MICE_subs <- BA_MICE_subs %>%
+  dplyr::select("State", "mean", "se")
+
+BA_MICE_subs[2,2:3] <- NA
+BA_MICE_subs[44,2:3] <- NA
+
+#FH
+BA_FH_subs <- read_csv("[filepath]/BA-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "BA_eblups", "BA_eblup_se")
+
+#NNI
+BA_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_BA_Mean", "NR_BA_SE")
+
+#merge with #full_join()
+BA_FLEXCS_DF <- full_join(BA_MICE_subs, BA_FH_subs, by = "State") %>%
+  full_join(BA_NNI_subs, by = "State")
+
+```
+
+B (Subsestimates: FH, WPE, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#FH
+B_FH_subs <- read_csv("[filepath]/B-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "B_eblups", "B_eblup_se")
+
+#WPE
+B_WPE_subs <- read_csv("[filepath]/WPE-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "blk_wpe", "blk_var")
+
+#NNI
+B_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_B_Mean", "NR_B_SE")
+
+#merge with #full_join()
+B_FLEXCS_DF <- full_join(B_FH_subs, B_WPE_subs, by = "State") %>%
+  full_join(B_NNI_subs, by = "State")
+
+```
+
+H (Subsestimates: FH, WPE, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#FH
+H_FH_subs <- read_csv("[filepath]/H-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "H_eblups", "H_eblup_se")
+
+#WPE
+H_WPE_subs <- read_csv("[filepath]/WPE-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "hsp_wpe", "hsp_var")
+
+#NNI
+H_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_H_Mean", "NR_H_SE")
+
+#merge with #full_join()
+H_FLEXCS_DF <- full_join(H_FH_subs, H_WPE_subs, by = "State") %>%
+  full_join(H_NNI_subs, by = "State")
+
+```
+
+API (Subsestimates: FH, WPE, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#FH
+API_FH_subs <- read_csv("[filepath]/API-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "API_eblups", "API_eblup_se")
+
+#WPE
+API_WPE_subs <- read_csv("[filepath]/WPE-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "asn_wpe", "asn_var")
+
+#NNI
+API_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_API_Mean", "NR_API_SE")
+
+#merge with #full_join()
+API_FLEXCS_DF <- full_join(API_FH_subs, API_WPE_subs, by = "State") %>%
+  full_join(API_NNI_subs, by = "State")
+
+```
+
+AINA (Subsestimates: FH, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#FH
+AINA_FH_subs <- read_csv("[filepath]/AINA-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "AINA_eblups", "AINA_eblup_se")
+
+#NNI
+AINA_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_AINA_Mean", "NR_AINA_SE")
+
+#merge with #full_join()
+AINA_FLEXCS_DF <- full_join(AINA_FH_subs, AINA_NNI_subs, by = "State")
+
+```
+ 
+TP (Subsestimates: FH, NNI) 
+```{r warning=FALSE, message=FALSE}
+
+#FH
+TP_FH_subs <- read_csv("[filepath]/TP-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "TP_eblups", "TP_eblup_se")
+
+#NNI
+TP_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_TP_Mean", "NR_TP_SE")
+
+#merge with #full_join()
+TP_FLEXCS_DF <- full_join(TP_FH_subs, TP_NNI_subs, by = "State")
+
+
+```
+
+EL (Subsestimates: FH, NNI)
+```{r warning=FALSE, message=FALSE}
+
+#FH
+EL_FH_subs <- read_csv("[filepath]/EL-FH-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "EL_eblups", "EL_eblup_se")
+
+#NNI
+EL_NNI_subs <- read_csv("[filepath]/NNI-SUBESTIMATES.csv") %>%
+  dplyr::select("State", "NR_EL_Mean", "NR_EL_SE")
+
+#merge with #full_join()
+EL_FLEXCS_DF <- full_join(EL_FH_subs, EL_NNI_subs, by = "State")
+
+```
+
+### Calculate FLEX CS mean estimates and variance estimates
+
+**First, the mean estimates (precision-weighted averages)**
+
+NHS
+```{r}
+#Will have 5 variables (State, NHS_eblups, NHS_eblup_se, NR_NHS_Mean, NR_NHS_SE)
+
+NHS_FLEXCS_DF$complete <- complete.cases(NHS_FLEXCS_DF)
+
+#Numerator
+NHS_FLEXCS_DF$Numerator <- ifelse(NHS_FLEXCS_DF$complete == TRUE, 
+       (NHS_FLEXCS_DF$NHS_eblups/NHS_FLEXCS_DF$NHS_eblup_se^2) + (NHS_FLEXCS_DF$NR_NHS_Mean/NHS_FLEXCS_DF$NR_NHS_SE^2),
+       (NHS_FLEXCS_DF$NHS_eblups/NHS_FLEXCS_DF$NHS_eblup_se^2))
+
+#Denominator
+NHS_FLEXCS_DF$Denominator <- ifelse(NHS_FLEXCS_DF$complete == TRUE,
+(1/NHS_FLEXCS_DF$NHS_eblup_se^2) + (1/NHS_FLEXCS_DF$NR_NHS_SE^2), 1/NHS_FLEXCS_DF$NHS_eblup_se^2)
+
+#FLEX_CS_ESTIMATE
+NHS_FLEXCS_DF$FLEX_CS_ESTIMATE <- NHS_FLEXCS_DF$Numerator/NHS_FLEXCS_DF$Denominator
+
+
+```
+
+HS
+```{r}
+#Will have 7 variables (State, mean, se, HS_eblups, HS_eblup_se, NR_HS_Mean, NR_HS_SE)
+
+#Filter out cases with missing values (if there are any)
+HS_FLEXCS_DF <- HS_FLEXCS_DF %>%
+  filter(HS_eblups > 0)
+
+HS_FLEXCS_DF$complete <- complete.cases(HS_FLEXCS_DF)
+
+#Numerator
+HS_FLEXCS_DF$Numerator <- 
+  ifelse(HS_FLEXCS_DF$complete == TRUE,
+         (HS_FLEXCS_DF$mean/HS_FLEXCS_DF$se^2) + (HS_FLEXCS_DF$HS_eblups/HS_FLEXCS_DF$HS_eblup_se^2) + (HS_FLEXCS_DF$NR_HS_Mean/HS_FLEXCS_DF$NR_HS_SE^2), 
+(HS_FLEXCS_DF$mean/HS_FLEXCS_DF$se^2) + (HS_FLEXCS_DF$HS_eblups/HS_FLEXCS_DF$HS_eblup_se^2))
+
+#Denominator
+HS_FLEXCS_DF$Denominator <- ifelse(HS_FLEXCS_DF$complete == TRUE,
+(1/HS_FLEXCS_DF$HS_eblup_se^2) + (1/HS_FLEXCS_DF$NR_HS_SE^2) + (1/HS_FLEXCS_DF$se^2), (1/HS_FLEXCS_DF$HS_eblup_se^2) + (1/HS_FLEXCS_DF$se^2))
+
+
+#FLEX_CS_ESTIMATE
+HS_FLEXCS_DF$FLEX_CS_ESTIMATE <- HS_FLEXCS_DF$Numerator/HS_FLEXCS_DF$Denominator
+
+```
+
+
+SBA
+```{r}
+
+#Will have 7 variables (State, mean, se, SBA_eblups, SBA_eblup_se, NR_SBA_Mean, NR_SBA_SE)
+
+#Filter out cases with missing values (if there are any)
+SBA_FLEXCS_DF <- SBA_FLEXCS_DF %>%
+  filter(SBA_eblups > 0)
+
+SBA_FLEXCS_DF$complete <- complete.cases(SBA_FLEXCS_DF)
+
+#Numerator
+SBA_FLEXCS_DF$Numerator <- 
+  ifelse(SBA_FLEXCS_DF$complete == TRUE,
+         (SBA_FLEXCS_DF$mean/SBA_FLEXCS_DF$se^2) + (SBA_FLEXCS_DF$SBA_eblups/SBA_FLEXCS_DF$SBA_eblup_se^2) + (SBA_FLEXCS_DF$NR_SBA_Mean/SBA_FLEXCS_DF$NR_SBA_SE^2), 
+(SBA_FLEXCS_DF$mean/SBA_FLEXCS_DF$se^2) + (SBA_FLEXCS_DF$SBA_eblups/SBA_FLEXCS_DF$SBA_eblup_se^2))
+
+#Denominator
+SBA_FLEXCS_DF$Denominator <- ifelse(SBA_FLEXCS_DF$complete == TRUE,
+(1/SBA_FLEXCS_DF$SBA_eblup_se^2) + (1/SBA_FLEXCS_DF$NR_SBA_SE^2) + (1/SBA_FLEXCS_DF$se^2), (1/SBA_FLEXCS_DF$SBA_eblup_se^2) + (1/SBA_FLEXCS_DF$se^2))
+
+
+#FLEX_CS_ESTIMATE
+SBA_FLEXCS_DF$FLEX_CS_ESTIMATE <- SBA_FLEXCS_DF$Numerator/SBA_FLEXCS_DF$Denominator
+
+```
+
+BA
+```{r}
+
+#Will have 7 variables (State, mean, se, BA_eblups, BA_eblup_se, NR_BA_Mean, NR_BA_SE)
+
+#Filter out cases with missing values (if there are any)
+BA_FLEXCS_DF <- BA_FLEXCS_DF %>%
+  filter(BA_eblups > 0)
+
+BA_FLEXCS_DF$complete <- complete.cases(BA_FLEXCS_DF)
+
+#Numerator
+BA_FLEXCS_DF$Numerator <- 
+  ifelse(BA_FLEXCS_DF$complete == TRUE,
+         (BA_FLEXCS_DF$mean/BA_FLEXCS_DF$se^2) + (BA_FLEXCS_DF$BA_eblups/BA_FLEXCS_DF$BA_eblup_se^2) + (BA_FLEXCS_DF$NR_BA_Mean/BA_FLEXCS_DF$NR_BA_SE^2), 
+(BA_FLEXCS_DF$mean/BA_FLEXCS_DF$se^2) + (BA_FLEXCS_DF$BA_eblups/BA_FLEXCS_DF$BA_eblup_se^2))
+
+#Denominator
+BA_FLEXCS_DF$Denominator <- ifelse(BA_FLEXCS_DF$complete == TRUE,
+(1/BA_FLEXCS_DF$BA_eblup_se^2) + (1/BA_FLEXCS_DF$NR_BA_SE^2) + (1/BA_FLEXCS_DF$se^2), (1/BA_FLEXCS_DF$BA_eblup_se^2) + (1/BA_FLEXCS_DF$se^2))
+
+#FLEX_CS_ESTIMATE
+BA_FLEXCS_DF$FLEX_CS_ESTIMATE <- BA_FLEXCS_DF$Numerator/BA_FLEXCS_DF$Denominator
+
+```
+
+B
+```{r}
+
+#Will have 7 variables (State, B_eblups, B_eblup_se, blk_wpe, blk_var, NR_B_Mean, NR_B_SE)
+
+#Filter out cases with missing values (if there are any)
+B_FLEXCS_DF <- B_FLEXCS_DF %>%
+  filter(B_eblups > 0)
+
+#Convert missing values (0) to NA
+B_FLEXCS_DF$blk_wpe[B_FLEXCS_DF$blk_wpe==0] <- NA
+
+#Numerator
+B_FLEXCS_DF <- B_FLEXCS_DF %>%
+  mutate(eblup_ratio = B_eblups/B_eblup_se^2,
+         wpe_ratio = blk_wpe/blk_var,
+         nni_ratio = NR_B_Mean/NR_B_SE^2)
+B_FLEXCS_DF$Numerator <- rowSums(B_FLEXCS_DF[,8:10], na.rm = T)
+  
+#Denominator
+B_FLEXCS_DF <- B_FLEXCS_DF %>%
+  mutate(eblup_var_inv = 1/B_eblup_se^2,
+         wpe_var_inv = 1/blk_var,
+         nni_var_inv = 1/NR_B_SE^2)
+B_FLEXCS_DF$Denominator <- rowSums(B_FLEXCS_DF[,12:14], na.rm = T)
+
+#FLEX_CS_ESTIMATE
+B_FLEXCS_DF$FLEX_CS_ESTIMATE <- B_FLEXCS_DF$Numerator/B_FLEXCS_DF$Denominator
+
+```
+
+H
+```{r}
+
+#Will have 7 variables (State, H_eblups, H_eblup_se, hsp_wpe, hsp_var, NR_H_Mean, NR_H_SE)
+
+#Filter out cases with missing values (if there are any)
+H_FLEXCS_DF <- H_FLEXCS_DF %>%
+  filter(H_eblups > 0)
+
+#Convert missing values (0) to NA
+H_FLEXCS_DF$hsp_wpe[H_FLEXCS_DF$hsp_wpe==0] <- NA
+
+#Numerator
+H_FLEXCS_DF <- H_FLEXCS_DF %>%
+  mutate(eblup_ratio = H_eblups/H_eblup_se^2,
+         wpe_ratio = hsp_wpe/hsp_var,
+         nni_ratio = NR_H_Mean/NR_H_SE^2)
+H_FLEXCS_DF$Numerator <- rowSums(H_FLEXCS_DF[,8:10], na.rm = T)
+  
+#Denominator
+H_FLEXCS_DF <- H_FLEXCS_DF %>%
+  mutate(eblup_var_inv = 1/H_eblup_se^2,
+         wpe_var_inv = 1/hsp_var,
+         nni_var_inv = 1/NR_H_SE^2)
+H_FLEXCS_DF$Denominator <- rowSums(H_FLEXCS_DF[,12:14], na.rm = T)
+
+#FLEX_CS_ESTIMATE
+H_FLEXCS_DF$FLEX_CS_ESTIMATE <- H_FLEXCS_DF$Numerator/H_FLEXCS_DF$Denominator
+
+
+```
+
+API
+```{r}
+
+#Will have 7 variables (State, API_eblups, API_eblup_se, asn_wpe, asn_var, NR_API_Mean, NR_API_SE)
+
+#Filter out cases with missing values (if there are any)
+API_FLEXCS_DF <- API_FLEXCS_DF %>%
+  filter(API_eblups > 0)
+
+#Convert missing values (0) to NA
+API_FLEXCS_DF$asn_wpe[API_FLEXCS_DF$asn_wpe==0] <- NA
+
+#Numerator
+API_FLEXCS_DF <- API_FLEXCS_DF %>%
+  mutate(eblup_ratio = API_eblups/API_eblup_se^2,
+         wpe_ratio = asn_wpe/asn_var,
+         nni_ratio = NR_API_Mean/NR_API_SE^2)
+API_FLEXCS_DF$Numerator <- rowSums(API_FLEXCS_DF[,8:10], na.rm = T)
+  
+#Denominator
+API_FLEXCS_DF <- API_FLEXCS_DF %>%
+  mutate(eblup_var_inv = 1/API_eblup_se^2,
+         wpe_var_inv = 1/asn_var,
+         nni_var_inv = 1/NR_API_SE^2)
+API_FLEXCS_DF$Denominator <- rowSums(API_FLEXCS_DF[,12:14], na.rm = T)
+
+#FLEX_CS_ESTIMATE
+API_FLEXCS_DF$FLEX_CS_ESTIMATE <- API_FLEXCS_DF$Numerator/API_FLEXCS_DF$Denominator
+
+```
+
+AINA
+```{r}
+
+#Will have 5 variables (State, AINA_eblups, AINA_eblup_se, NR_AINA_Mean, NR_AINA_SE)
+
+#Filter out cases with missing values (if there are any)
+AINA_FLEXCS_DF <- AINA_FLEXCS_DF %>%
+  filter(AINA_eblups > 0)
+
+AINA_FLEXCS_DF$complete <- complete.cases(AINA_FLEXCS_DF)
+
+#Numerator
+AINA_FLEXCS_DF$Numerator <- ifelse(AINA_FLEXCS_DF$complete == TRUE, 
+       (AINA_FLEXCS_DF$AINA_eblups/AINA_FLEXCS_DF$AINA_eblup_se^2) + (AINA_FLEXCS_DF$NR_AINA_Mean/AINA_FLEXCS_DF$NR_AINA_SE^2),
+       (AINA_FLEXCS_DF$AINA_eblups/AINA_FLEXCS_DF$AINA_eblup_se^2))
+
+#Denominator
+AINA_FLEXCS_DF$Denominator <- ifelse(AINA_FLEXCS_DF$complete == TRUE,
+(1/AINA_FLEXCS_DF$AINA_eblup_se^2) + (1/AINA_FLEXCS_DF$NR_AINA_SE^2), 1/AINA_FLEXCS_DF$AINA_eblup_se^2)
+
+#FLEX_CS_ESTIMATE
+AINA_FLEXCS_DF$FLEX_CS_ESTIMATE <- AINA_FLEXCS_DF$Numerator/AINA_FLEXCS_DF$Denominator
+
+```
+
+TP
+```{r}
+
+#Will have 5 variables (State, TP_eblups, TP_eblup_se, NR_TP_Mean, NR_TP_SE)
+
+#Filter out cases with missing values (if there are any)
+TP_FLEXCS_DF <- TP_FLEXCS_DF %>%
+  filter(TP_eblups > 0)
+
+TP_FLEXCS_DF$complete <- complete.cases(TP_FLEXCS_DF)
+
+#Numerator
+TP_FLEXCS_DF$Numerator <- ifelse(TP_FLEXCS_DF$complete == TRUE, 
+       (TP_FLEXCS_DF$TP_eblups/TP_FLEXCS_DF$TP_eblup_se^2) + (TP_FLEXCS_DF$NR_TP_Mean/TP_FLEXCS_DF$NR_TP_SE^2),
+       (TP_FLEXCS_DF$TP_eblups/TP_FLEXCS_DF$TP_eblup_se^2))
+
+#Denominator
+TP_FLEXCS_DF$Denominator <- ifelse(TP_FLEXCS_DF$complete == TRUE,
+(1/TP_FLEXCS_DF$TP_eblup_se^2) + (1/TP_FLEXCS_DF$NR_TP_SE^2), 1/TP_FLEXCS_DF$TP_eblup_se^2)
+
+#FLEX_CS_ESTIMATE
+TP_FLEXCS_DF$FLEX_CS_ESTIMATE <- TP_FLEXCS_DF$Numerator/TP_FLEXCS_DF$Denominator
+
+```
+
+EL
+```{r}
+
+#Will have 5 variables (State, EL_eblups, EL_eblup_se, NR_EL_Mean, NR_EL_SE)
+
+#Filter out cases with missing values (if there are any)
+EL_FLEXCS_DF <- EL_FLEXCS_DF %>%
+  filter(EL_eblups > 0)
+
+EL_FLEXCS_DF$complete <- complete.cases(EL_FLEXCS_DF)
+
+#Numerator
+EL_FLEXCS_DF$Numerator <- ifelse(EL_FLEXCS_DF$complete == TRUE, 
+       (EL_FLEXCS_DF$EL_eblups/EL_FLEXCS_DF$EL_eblup_se^2) + (EL_FLEXCS_DF$NR_EL_Mean/EL_FLEXCS_DF$NR_EL_SE^2),
+       (EL_FLEXCS_DF$EL_eblups/EL_FLEXCS_DF$EL_eblup_se^2))
+
+#Denominator
+EL_FLEXCS_DF$Denominator <- ifelse(EL_FLEXCS_DF$complete == TRUE,
+(1/EL_FLEXCS_DF$EL_eblup_se^2) + (1/EL_FLEXCS_DF$NR_EL_SE^2), 1/EL_FLEXCS_DF$EL_eblup_se^2)
+
+#FLEX_CS_ESTIMATE
+EL_FLEXCS_DF$FLEX_CS_ESTIMATE <- EL_FLEXCS_DF$Numerator/EL_FLEXCS_DF$Denominator
+
+```
+
+**Second, the variance estimates** 
+
+NHS
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, NHS_eblups, NHS_eblup_se, NR_NHS_Mean, NR_NHS_SE
+
+#FLEX_CS_VAR_ESTIMATE
+NHS_FLEXCS_DF$NHS_eblup_var <- NHS_FLEXCS_DF$NHS_eblup_se^2
+NHS_FLEXCS_DF$NR_NHS_var <- NHS_FLEXCS_DF$NR_NHS_SE^2
+NHS_FLEXCS_DF$mean_var <- rowMeans(NHS_FLEXCS_DF[,10:11], na.rm = TRUE)
+
+NHS_FLEXCS_DF$NHS_eblups_temp <- NHS_FLEXCS_DF$NHS_eblups
+NHS_FLEXCS_DF$NR_NHS_Mean_temp <- NHS_FLEXCS_DF$NR_NHS_Mean
+NHS_FLEXCS_DF$sub_var <- rowVars(as.matrix(NHS_FLEXCS_DF[,13:14]), na.rm = TRUE)
+
+NHS_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <- ifelse(NHS_FLEXCS_DF$complete==TRUE, NHS_FLEXCS_DF$mean_var + NHS_FLEXCS_DF$sub_var, NHS_FLEXCS_DF$mean_var)
+
+
+```
+
+
+HS
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, mean, se, HS_eblups, HS_eblup_se, NR_HS_Mean, NR_HS_SE
+
+#FLEX_CS_VAR_ESTIMATE
+HS_FLEXCS_DF$mice_var <- HS_FLEXCS_DF$se^2
+HS_FLEXCS_DF$HS_eblup_var <- HS_FLEXCS_DF$HS_eblup_se^2
+HS_FLEXCS_DF$NR_HS_var <- HS_FLEXCS_DF$NR_HS_SE^2
+HS_FLEXCS_DF$mean_var <- rowMeans(HS_FLEXCS_DF[,12:14], na.rm = TRUE)
+
+HS_FLEXCS_DF$mean_temp <- HS_FLEXCS_DF$mean
+HS_FLEXCS_DF$HS_eblups_temp <- HS_FLEXCS_DF$HS_eblups
+HS_FLEXCS_DF$NR_HS_Mean_temp <- HS_FLEXCS_DF$NR_HS_Mean
+HS_FLEXCS_DF$sub_var <- rowVars(as.matrix(HS_FLEXCS_DF[,16:18]), na.rm = TRUE)
+
+HS_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <-HS_FLEXCS_DF$mean_var + HS_FLEXCS_DF$sub_var
+
+```
+
+SBA
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, mean, se, SBA_eblups, SBA_eblup_se, NR_SBA_Mean, NR_SBA_SE
+
+#FLEX_CS_VAR_ESTIMATE
+SBA_FLEXCS_DF$mice_var <- SBA_FLEXCS_DF$se^2
+SBA_FLEXCS_DF$SBA_eblup_var <- SBA_FLEXCS_DF$SBA_eblup_se^2
+SBA_FLEXCS_DF$NR_SBA_var <- SBA_FLEXCS_DF$NR_SBA_SE^2
+SBA_FLEXCS_DF$mean_var <- rowMeans(SBA_FLEXCS_DF[,12:14], na.rm = TRUE)
+
+SBA_FLEXCS_DF$mean_temp <- SBA_FLEXCS_DF$mean
+SBA_FLEXCS_DF$SBA_eblups_temp <- SBA_FLEXCS_DF$SBA_eblups
+SBA_FLEXCS_DF$NR_SBA_Mean_temp <- SBA_FLEXCS_DF$NR_SBA_Mean
+SBA_FLEXCS_DF$sub_var <- rowVars(as.matrix(SBA_FLEXCS_DF[,16:18]), na.rm = TRUE)
+
+SBA_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <-SBA_FLEXCS_DF$mean_var + SBA_FLEXCS_DF$sub_var
+
+```
+
+BA
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, mean, se, BA_eblups, BA_eblup_se, NR_BA_Mean, NR_BA_SE
+
+#FLEX_CS_VAR_ESTIMATE
+BA_FLEXCS_DF$mice_var <- BA_FLEXCS_DF$se^2
+BA_FLEXCS_DF$BA_eblup_var <- BA_FLEXCS_DF$BA_eblup_se^2
+BA_FLEXCS_DF$NR_BA_var <- BA_FLEXCS_DF$NR_BA_SE^2
+BA_FLEXCS_DF$mean_var <- rowMeans(BA_FLEXCS_DF[,12:14], na.rm = TRUE)
+
+BA_FLEXCS_DF$mean_temp <- BA_FLEXCS_DF$mean
+BA_FLEXCS_DF$BA_eblups_temp <- BA_FLEXCS_DF$BA_eblups
+BA_FLEXCS_DF$NR_BA_Mean_temp <- BA_FLEXCS_DF$NR_BA_Mean
+BA_FLEXCS_DF$sub_var <- rowVars(as.matrix(BA_FLEXCS_DF[,16:18]), na.rm = TRUE)
+
+BA_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <-BA_FLEXCS_DF$mean_var + BA_FLEXCS_DF$sub_var
+
+```
+
+B
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, B_eblups, B_eblup_se, blk_wpe, blk_var, NR_B_Mean, NR_B_SE
+
+#FLEX_CS_VAR_ESTIMATE
+B_FLEXCS_DF$B_eblup_var <- B_FLEXCS_DF$B_eblup_se^2
+B_FLEXCS_DF$blk_var_temp <- B_FLEXCS_DF$blk_var
+B_FLEXCS_DF$NR_B_var <- B_FLEXCS_DF$NR_B_SE^2
+B_FLEXCS_DF$mean_var <- rowMeans(B_FLEXCS_DF[,17:19], na.rm = TRUE)
+
+B_FLEXCS_DF$B_eblups_temp <- B_FLEXCS_DF$B_eblups
+B_FLEXCS_DF$blk_wpe_temp <- B_FLEXCS_DF$blk_wpe
+B_FLEXCS_DF$NR_B_Mean_temp <- B_FLEXCS_DF$NR_B_Mean
+B_FLEXCS_DF$sub_var <- rowVars(as.matrix(B_FLEXCS_DF[,21:23]), na.rm = TRUE)
+
+B_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <-
+  ifelse(is.na(B_FLEXCS_DF$sub_var),
+         B_FLEXCS_DF$mean_var,
+         B_FLEXCS_DF$mean_var + B_FLEXCS_DF$sub_var)
+
+```
+
+H
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, H_eblups, H_eblup_se, hsp_wpe, hsp_var, NR_H_Mean, NR_H_SE
+
+#FLEX_CS_VAR_ESTIMATE
+H_FLEXCS_DF$H_eblup_var <- H_FLEXCS_DF$H_eblup_se^2
+H_FLEXCS_DF$hsp_var_temp <- H_FLEXCS_DF$hsp_var
+H_FLEXCS_DF$NR_H_var <- H_FLEXCS_DF$NR_H_SE^2
+H_FLEXCS_DF$mean_var <- rowMeans(H_FLEXCS_DF[,17:19], na.rm = TRUE)
+
+H_FLEXCS_DF$H_eblups_temp <- H_FLEXCS_DF$H_eblups
+H_FLEXCS_DF$hsp_wpe_temp <- H_FLEXCS_DF$hsp_wpe
+H_FLEXCS_DF$NR_H_Mean_temp <- H_FLEXCS_DF$NR_H_Mean
+H_FLEXCS_DF$sub_var <- rowVars(as.matrix(H_FLEXCS_DF[,21:23]), na.rm = TRUE)
+
+H_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <-
+  ifelse(is.na(H_FLEXCS_DF$sub_var),
+         H_FLEXCS_DF$mean_var,
+         H_FLEXCS_DF$mean_var + H_FLEXCS_DF$sub_var)
+
+```
+
+API
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, API_eblups, API_eblup_se, asn_wpe, asn_var, NR_API_Mean, NR_API_SE
+
+#FLEX_CS_VAR_ESTIMATE
+API_FLEXCS_DF$API_eblup_var <- API_FLEXCS_DF$API_eblup_se^2
+API_FLEXCS_DF$asn_var_temp <- API_FLEXCS_DF$asn_var
+API_FLEXCS_DF$NR_API_var <- API_FLEXCS_DF$NR_API_SE^2
+API_FLEXCS_DF$mean_var <- rowMeans(API_FLEXCS_DF[,17:19], na.rm = TRUE)
+
+API_FLEXCS_DF$API_eblups_temp <- API_FLEXCS_DF$API_eblups
+API_FLEXCS_DF$asn_wpe_temp <- API_FLEXCS_DF$asn_wpe
+API_FLEXCS_DF$NR_API_Mean_temp <- API_FLEXCS_DF$NR_API_Mean
+API_FLEXCS_DF$sub_var <- rowVars(as.matrix(API_FLEXCS_DF[,21:23]), na.rm = TRUE)
+
+API_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <-
+  ifelse(is.na(API_FLEXCS_DF$sub_var),
+         API_FLEXCS_DF$mean_var,
+         API_FLEXCS_DF$mean_var + API_FLEXCS_DF$sub_var)
+
+```
+
+AINA
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, AINA_eblups, AINA_eblup_se, NR_AINA_Mean, NR_AINA_SE
+
+
+#FLEX_CS_VAR_ESTIMATE
+AINA_FLEXCS_DF$AINA_eblup_var <- AINA_FLEXCS_DF$AINA_eblup_se^2
+AINA_FLEXCS_DF$NR_AINA_var <- AINA_FLEXCS_DF$NR_AINA_SE^2
+AINA_FLEXCS_DF$mean_var <- rowMeans(AINA_FLEXCS_DF[,10:11], na.rm = TRUE)
+
+AINA_FLEXCS_DF$AINA_eblups_temp <- AINA_FLEXCS_DF$AINA_eblups
+AINA_FLEXCS_DF$NR_AINA_Mean_temp <- AINA_FLEXCS_DF$NR_AINA_Mean
+AINA_FLEXCS_DF$sub_var <- rowVars(as.matrix(AINA_FLEXCS_DF[,13:14]), na.rm = TRUE)
+
+AINA_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <- ifelse(AINA_FLEXCS_DF$complete==TRUE, AINA_FLEXCS_DF$mean_var + AINA_FLEXCS_DF$sub_var, AINA_FLEXCS_DF$mean_var)
+
+```
+
+TP
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, TP_eblups, TP_eblup_se, NR_TP_Mean, NR_TP_SE
+
+#FLEX_CS_VAR_ESTIMATE
+TP_FLEXCS_DF$TP_eblup_var <- TP_FLEXCS_DF$TP_eblup_se^2
+TP_FLEXCS_DF$NR_TP_var <- TP_FLEXCS_DF$NR_TP_SE^2
+TP_FLEXCS_DF$mean_var <- rowMeans(TP_FLEXCS_DF[,10:11], na.rm = TRUE)
+
+TP_FLEXCS_DF$TP_eblups_temp <- TP_FLEXCS_DF$TP_eblups
+TP_FLEXCS_DF$NR_TP_Mean_temp <- TP_FLEXCS_DF$NR_TP_Mean
+TP_FLEXCS_DF$sub_var <- rowVars(as.matrix(TP_FLEXCS_DF[,13:14]), na.rm = TRUE)
+
+TP_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <- ifelse(TP_FLEXCS_DF$complete==TRUE, TP_FLEXCS_DF$mean_var + TP_FLEXCS_DF$sub_var, TP_FLEXCS_DF$mean_var)
+
+
+```
+
+EL
+```{r, message=FALSE, warning=FALSE}
+
+#Variables: State, EL_eblups, EL_eblup_se, NR_EL_Mean, NR_EL_SE
+
+#FLEX_CS_VAR_ESTIMATE
+EL_FLEXCS_DF$EL_eblup_var <- EL_FLEXCS_DF$EL_eblup_se^2
+EL_FLEXCS_DF$NR_EL_var <- EL_FLEXCS_DF$NR_EL_SE^2
+EL_FLEXCS_DF$mean_var <- rowMeans(EL_FLEXCS_DF[,10:11], na.rm = TRUE)
+
+EL_FLEXCS_DF$EL_eblups_temp <- EL_FLEXCS_DF$EL_eblups
+EL_FLEXCS_DF$NR_EL_Mean_temp <- EL_FLEXCS_DF$NR_EL_Mean
+EL_FLEXCS_DF$sub_var <- rowVars(as.matrix(EL_FLEXCS_DF[,13:14]), na.rm = TRUE)
+
+EL_FLEXCS_DF$FLEX_CS_VAR_ESTIMATE <- ifelse(EL_FLEXCS_DF$complete==TRUE, EL_FLEXCS_DF$mean_var + EL_FLEXCS_DF$sub_var, EL_FLEXCS_DF$mean_var)
+
+  
+```
+
+### Export and prepare estimates for calculating accuracy statistics 
+```{r warning=FALSE, message=FALSE}
+
+#NHS
+write.csv(NHS_FLEXCS_DF, "[filepath]/NHS-FLEXCS-ESTIMATES.csv")
+
+#HS
+write.csv(HS_FLEXCS_DF, "[filepath]/HS-FLEXCS-ESTIMATES.csv")
+
+#SBA
+write.csv(SBA_FLEXCS_DF, "[filepath]/SBA-FLEXCS-ESTIMATES.csv")
+
+#BA
+write.csv(BA_FLEXCS_DF, "[filepath]/BA-FLEXCS-ESTIMATES.csv")
+
+#B
+write.csv(B_FLEXCS_DF, "[filepath]/B-FLEXCS-ESTIMATES.csv")
+
+#H
+write.csv(H_FLEXCS_DF, "[filepath]/H-FLEXCS-ESTIMATES.csv")
+
+#API
+write.csv(API_FLEXCS_DF, "[filepath]/API-FLEXCS-ESTIMATES.csv")
+
+#AINA
+write.csv(AINA_FLEXCS_DF, "[filepath]/AINA-FLEXCS-ESTIMATES.csv")
+
+#TP
+write.csv(TP_FLEXCS_DF, "[filepath]/TP-FLEXCS-ESTIMATES.csv")
+
+#EL
+write.csv(EL_FLEXCS_DF, "[filepath]/EL-FLEXCS-ESTIMATES.csv")
+
+```
+
+### Calculate wMAE for FLEX CS technique
+
+**Free up memory**
+```{r warning=FALSE, message=FALSE}
+rm(list = ls())
+```
+
+**Define a wMAE function**
+```{r warning=FALSE, message=FALSE}
+
+wmae <- function(x){
+  w_abs_errors <- abs(x[,2] - x[,4])/x[,3]
+  mean(w_abs_errors[,1])
+}
+
+```
+
+NHS
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+NHS_predicted <- read_csv("[filepath]/NHS-FLEXCS-ESTIMATES.csv")
+NHS_predicted <- NHS_predicted[,-1]
+names(NHS_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+NHS_observed <- read_csv("[filepath]/NHS.csv")
+NHS_observed <- NHS_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+NHS <- inner_join(NHS_observed, NHS_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(NHS)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make NHS tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(NHS$State, source, NHS$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(NHS$State, source, NHS$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+NHS_tidy <- rbind(part1, part2)
+
+NHS_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+NHS_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+NHS_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+HS
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+HS_predicted <- read_csv("[filepath]/HS-FLEXCS-ESTIMATES.csv")
+HS_predicted <- HS_predicted[,-1]
+names(HS_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+HS_observed <- read_csv("[filepath]/HS.csv")
+HS_observed <- HS_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+HS <- inner_join(HS_observed, HS_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(HS)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make HS tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(HS$State, source, HS$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(HS$State, source, HS$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+HS_tidy <- rbind(part1, part2)
+
+HS_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+HS_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+HS_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+SBA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+SBA_predicted <- read_csv("[filepath]/SBA-FLEXCS-ESTIMATES.csv")
+SBA_predicted <- SBA_predicted[,-1]
+names(SBA_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+SBA_observed <- read_csv("[filepath]/SBA.csv")
+SBA_observed <- SBA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+SBA <- inner_join(SBA_observed, SBA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(SBA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make SBA tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(SBA$State, source, SBA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(SBA$State, source, SBA$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+SBA_tidy <- rbind(part1, part2)
+
+SBA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+SBA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+SBA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+BA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+BA_predicted <- read_csv("[filepath]/BA-FLEXCS-ESTIMATES.csv")
+BA_predicted <- BA_predicted[,-1]
+names(BA_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+BA_observed <- read_csv("[filepath]/BA.csv")
+BA_observed <- BA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+BA <- inner_join(BA_observed, BA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(BA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make BA tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(BA$State, source, BA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(BA$State, source, BA$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+BA_tidy <- rbind(part1, part2)
+
+BA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+BA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+BA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+B
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+B_predicted <- read_csv("[filepath]/B-FLEXCS-ESTIMATES.csv")
+B_predicted <- B_predicted[,-1]
+names(B_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+B_observed <- read_csv("[filepath]/B.csv")
+B_observed <- B_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+B <- inner_join(B_observed, B_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(B)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r message=FALSE, warning=FALSE}
+
+#Make B tidy
+
+source <- rep(c("NAEP"), 39)
+source <- as.data.frame(source)
+part1 <- cbind(B$State, source, B$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 39)
+source <- as.data.frame(source)
+part2 <- cbind(B$State, source, B$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+B_tidy <- rbind(part1, part2)
+
+B_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+B_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+B_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+H
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+H_predicted <- read_csv("[filepath]/H-FLEXCS-ESTIMATES.csv")
+H_predicted <- H_predicted[,-1]
+names(H_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+H_observed <- read_csv("[filepath]/H.csv")
+H_observed <- H_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+H <- inner_join(H_observed, H_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(H)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make H tidy
+
+source <- rep(c("NAEP"), 47)
+source <- as.data.frame(source)
+part1 <- cbind(H$State, source, H$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 47)
+source <- as.data.frame(source)
+part2 <- cbind(H$State, source, H$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+H_tidy <- rbind(part1, part2)
+
+H_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+H_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+H_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+API
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+API_predicted <- read_csv("[filepath]/API-FLEXCS-ESTIMATES.csv")
+API_predicted <- API_predicted[,-1] 
+names(API_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+API_observed <- read_csv("[filepath]/API.csv")
+API_observed <- API_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+API <- inner_join(API_observed, API_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(API)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make API tidy
+
+source <- rep(c("NAEP"), 30)
+source <- as.data.frame(source)
+part1 <- cbind(API$State, source, API$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 30)
+source <- as.data.frame(source)
+part2 <- cbind(API$State, source, API$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+API_tidy <- rbind(part1, part2)
+
+API_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+API_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+API_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+AINA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+AINA_predicted <- read_csv("[filepath]/AINA-FLEXCS-ESTIMATES.csv")
+AINA_predicted <- AINA_predicted[,-1] 
+names(AINA_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+AINA_observed <- read_csv("[filepath]/AINA.csv")
+AINA_observed <- AINA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+AINA <- inner_join(AINA_observed, AINA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(AINA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make AINA tidy
+
+source <- rep(c("NAEP"), 13)
+source <- as.data.frame(source)
+part1 <- cbind(AINA$State, source, AINA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 13)
+source <- as.data.frame(source)
+part2 <- cbind(AINA$State, source, AINA$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+AINA_tidy <- rbind(part1, part2)
+
+AINA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+AINA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+AINA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+
+TP
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+TP_predicted <- read_csv("[filepath]/TP-FLEXCS-ESTIMATES.csv")
+TP_predicted <- TP_predicted[,-1]
+names(TP_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+TP_observed <- read_csv("[filepath]/2+.csv")
+TP_observed <- TP_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+TP <- inner_join(TP_observed, TP_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(TP)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make TP tidy
+
+source <- rep(c("NAEP"), 24)
+source <- as.data.frame(source)
+part1 <- cbind(TP$State, source, TP$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 24)
+source <- as.data.frame(source)
+part2 <- cbind(TP$State, source, TP$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+TP_tidy <- rbind(part1, part2)
+
+TP_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+TP_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+TP_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+EL
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+EL_predicted <- read_csv("[filepath]/EL-FLEXCS-ESTIMATES.csv")
+EL_predicted <- EL_predicted[,-1] 
+names(EL_predicted) <- c("State", "FLEXCS_mean", "FLEXCS_se")
+
+EL_observed <- read_csv("[filepath]/EL.csv")
+EL_observed <- EL_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+EL <- inner_join(EL_observed, EL_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(EL)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make EL tidy
+
+source <- rep(c("NAEP"), 31)
+source <- as.data.frame(source)
+part1 <- cbind(EL$State, source, EL$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FLEXCS"), 31)
+source <- as.data.frame(source)
+part2 <- cbind(EL$State, source, EL$FLEXCS_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+EL_tidy <- rbind(part1, part2)
+
+EL_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+EL_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+EL_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+**Overall**
+```{r message=FALSE, warning=FALSE}
+
+#Row bind subgroup datasets into an "overall dataset"
+overall <- rbind(NHS, HS, SBA, BA, B, H, API, AINA, TP, EL)
+
+#Calculate wMAE for FLEXCS across subgroups                         
+wmae(overall)
+
+```
+
+### Calculate Coverage for FLEXCS Technique
+
+First, add the median of the NAEP-reported state-level standard deviations to each respective subgroup's data set (this permits calculation of the b-statistic).
+
+```{r message=FALSE, warning=FALSE}
+
+NHS$median_sd <- 31.5
+HS$median_sd <- 32.6
+SBA$median_sd <- 30.6
+BA$median_sd <- 34.4
+B$median_sd <- 33.4
+H$median_sd <- 34.0
+API$median_sd <- 38.1
+AINA$median_sd <- 35.4
+TP$median_sd <- 35.2
+EL$median_sd <- 33.3
+
+```
+
+**By subgroup**
+
+NHS
+```{r message=FALSE, warning=FALSE}
+
+NHS$b_statisic <- abs(NHS$NAEP_mean-NHS$FLEXCS_mean)/NHS$median_sd
+mean(NHS$b_statisic <= 0.20)
+
+```
+
+NHS-visual
+```{r message=FALSE, warning=FALSE}
+
+NHS$lowerbound <- NHS$NAEP_mean - 0.2*NHS$median_sd
+NHS$upperbound <- NHS$NAEP_mean + 0.2*NHS$median_sd
+
+NHS <- NHS %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = NHS, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = NHS, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+
+```
+
+HS
+```{r message=FALSE, warning=FALSE}
+
+HS$b_statisic <- abs(HS$NAEP_mean-HS$FLEXCS_mean)/HS$median_sd
+mean(HS$b_statisic <= 0.20)
+
+```
+
+HS-visual
+```{r message=FALSE, warning=FALSE}
+
+HS$lowerbound <- HS$NAEP_mean - 0.2*HS$median_sd
+HS$upperbound <- HS$NAEP_mean + 0.2*HS$median_sd
+
+HS <- HS %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = HS, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = HS, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+
+SBA
+```{r message=FALSE, warning=FALSE}
+
+SBA$b_statisic <- abs(SBA$NAEP_mean-SBA$FLEXCS_mean)/SBA$median_sd
+mean(SBA$b_statisic <= 0.20)
+
+```
+
+SBA-visual
+```{r message=FALSE, warning=FALSE}
+
+SBA$lowerbound <- SBA$NAEP_mean - 0.2*SBA$median_sd
+SBA$upperbound <- SBA$NAEP_mean + 0.2*SBA$median_sd
+
+SBA <- SBA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = SBA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = SBA, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+BA
+```{r message=FALSE, warning=FALSE}
+
+BA$b_statisic <- abs(BA$NAEP_mean-BA$FLEXCS_mean)/BA$median_sd
+mean(BA$b_statisic <= 0.20)
+
+```
+
+BA-visual
+```{r message=FALSE, warning=FALSE}
+
+BA$lowerbound <- BA$NAEP_mean - 0.2*BA$median_sd
+BA$upperbound <- BA$NAEP_mean + 0.2*BA$median_sd
+
+BA <- BA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = BA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = BA, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+B
+```{r message=FALSE, warning=FALSE}
+
+B$b_statisic <- abs(B$NAEP_mean-B$FLEXCS_mean)/B$median_sd
+mean(B$b_statisic <= 0.20)
+
+```
+
+B-visual
+```{r message=FALSE, warning=FALSE}
+
+B$lowerbound <- B$NAEP_mean - 0.2*B$median_sd
+B$upperbound <- B$NAEP_mean + 0.2*B$median_sd
+
+B <- B %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = B, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = B, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+H
+```{r message=FALSE, warning=FALSE}
+
+H$b_statisic <- abs(H$NAEP_mean-H$FLEXCS_mean)/H$median_sd
+mean(H$b_statisic <= 0.20)
+
+```
+
+H-visual
+```{r message=FALSE, warning=FALSE}
+
+H$lowerbound <- H$NAEP_mean - 0.2*H$median_sd
+H$upperbound <- H$NAEP_mean + 0.2*H$median_sd
+
+H <- H %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = H, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = H, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+API
+```{r message=FALSE, warning=FALSE}
+
+API$b_statisic <- abs(API$NAEP_mean-API$FLEXCS_mean)/API$median_sd
+mean(API$b_statisic <= 0.20)
+
+```
+
+API-visual
+```{r message=FALSE, warning=FALSE}
+
+API$lowerbound <- API$NAEP_mean - 0.2*API$median_sd
+API$upperbound <- API$NAEP_mean + 0.2*API$median_sd
+
+API <- API %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = API, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = API, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+AINA
+```{r message=FALSE, warning=FALSE}
+
+AINA$b_statisic <- abs(AINA$NAEP_mean-AINA$FLEXCS_mean)/AINA$median_sd
+mean(AINA$b_statisic <= 0.20)
+
+```
+
+AINA-visual
+```{r message=FALSE, warning=FALSE}
+
+AINA$lowerbound <- AINA$NAEP_mean - 0.2*AINA$median_sd
+AINA$upperbound <- AINA$NAEP_mean + 0.2*AINA$median_sd
+
+AINA <- AINA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = AINA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = AINA, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+TP (2+)
+```{r message=FALSE, warning=FALSE}
+
+TP$b_statisic <- abs(TP$NAEP_mean-TP$FLEXCS_mean)/TP$median_sd
+mean(TP$b_statisic <= 0.20)
+
+```
+
+TP-visual
+```{r message=FALSE, warning=FALSE}
+
+TP$lowerbound <- TP$NAEP_mean - 0.2*TP$median_sd
+TP$upperbound <- TP$NAEP_mean + 0.2*TP$median_sd
+
+TP <- TP %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = TP, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = TP, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+EL
+```{r message=FALSE, warning=FALSE}
+
+EL$b_statisic <- abs(EL$NAEP_mean-EL$FLEXCS_mean)/EL$median_sd
+mean(EL$b_statisic <= 0.20)
+
+```
+
+EL-visual
+```{r message=FALSE, warning=FALSE}
+
+EL$lowerbound <- EL$NAEP_mean - 0.2*EL$median_sd
+EL$upperbound <- EL$NAEP_mean + 0.2*EL$median_sd
+
+EL <- EL %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = EL, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = EL, aes(FLEXCS_mean, State, col = "FLEXCS prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+**Overall**
+
+Row bind datasets
+```{r message=FALSE, warning=FALSE}
+
+#Row bind subgroup datasets into an "overall dataset"
+overall <- rbind(NHS, HS, SBA, BA, B, H, API, AINA, TP, EL)
+
+#Calculate coverage across groups
+mean(overall$b_statisic <= 0.20)

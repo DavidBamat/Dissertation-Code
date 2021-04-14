@@ -1,0 +1,1837 @@
+---
+title: "Chapter 4.2 Script FH Model"
+author: "David B"
+output: word_document
+---
+
+### Install/Load packages
+```{r, message=FALSE, warning=FALSE}
+if(!require(tidyverse)) install.packages("tidyverse", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(EdSurvey)) install.packages("EdSurvey", 
+                                         repos = "http://cran.us.r-project.org")
+if(!require(sae)) install.packages("sae", 
+                                         repos = "http://cran.us.r-project.org")
+```
+
+### Import & Wrangle Administrative Data
+
+**%B-H-AINA variable**
+
+These data are gathered through a publicly-available National Center for Education Statistics (NCES) website which hosts the Common Core of Data (CCD). These particular data were downloaded from http://nces.ed.gov/ccd/elsi/ through the Elementary / Secondary Information System "tableGenerator".  
+
+The downloaded data include the following state-level enrollment data for the 2014-15 academic year and grade 8 students.
+  - American Indian/Alaska Native - male
+  - American Indian/Alaska Native - female
+  - Asian or Asian/Pacific Islander - male
+  - Asian or Asian/Pacific Islander - female
+  - Hispanic - male
+  - Hispanic - female
+  - Black - male
+  - Black - female
+  - White - male
+  - White - female
+  - Two or more races - male
+  - Two or more races - female
+ 
+```{r, message=FALSE, warning=FALSE} 
+#Import
+demographic_df <- read_csv("[filepath]/Demographic Data for FH Approach.csv") %>%
+  dplyr::slice(6:57)
+
+#Change variable names
+var_names <- demographic_df[1,]
+names(demographic_df) <- var_names
+
+#One more slice
+demographic_df <- dplyr::slice(demographic_df, 2:52)
+
+#Remove DC
+demographic_df <- filter(demographic_df, `State Name` != "DISTRICT OF COLUMBIA")
+
+#Change class (type) of variable to permit arithmetic
+demographic_df <- apply(demographic_df[,2:13], 2, as.numeric)
+
+#restore State abbreviation variable
+State <- read_csv("[filepath]/2+.csv")
+State <- State[,1]
+demographic_df <- cbind(State, demographic_df)
+rm(State, var_names)
+
+#Combine male and female variables
+demographic_df$AINA <- demographic_df[,2] + demographic_df[,3] 
+demographic_df$API <- demographic_df[,4] + demographic_df[,5] 
+demographic_df$H <- demographic_df[,6] + demographic_df[,7]
+demographic_df$B <- demographic_df[,8] + demographic_df[,9]
+demographic_df$W <- demographic_df[,10] + demographic_df[,11]
+demographic_df$TP <- demographic_df[,12] + demographic_df[,13]
+
+demographic_df <- dplyr::select(demographic_df, "State", "AINA", "API", "H", "B", "W", "TP")
+         
+#create "total" variable
+demographic_df$total <- apply(demographic_df[,2:7], 1, sum)
+
+#Create B_H_AINA variable
+demographic_df$BHAINA_total <- demographic_df$AINA + demographic_df$H + demographic_df$B
+demographic_df$B_H_AINA <- demographic_df$BHAINA_total/demographic_df$total
+
+#Change scale of B_H_AINA from proportion to percent
+demographic_df$B_H_AINA <- demographic_df$B_H_AINA*100
+
+#remove redundancies
+demographic_df <- dplyr::select(demographic_df, "State", "B_H_AINA")
+```
+
+**FER variable**
+
+Composite measure of a state’s median household income and wealth (Family Economic Resources; “FER”)
+
+The income data come from page 3 of the following document on the US Census website:
+https://www.census.gov/content/dam/Census/library/publications/2017/acs/acsbr16-02.pdf
+
+The wealth data come from page 9 of the following document on the US Census website:
+https://www.census.gov/content/dam/Census/library/working-papers/2017/demo/FY2016-129.pdf
+
+```{r, warning=FALSE, message=FALSE}
+
+med_income <- c(45182, 74165, 52062, 42530, 65087, 64598, 72121, 61882, 49852, 51753, 74451, 48728, 60094, 50896, 55172, 54520, 45541, 46106, 52111, 76596, 71146, 51584, 64188, 40910, 50642, 49924, 55474, 53320, 70813, 73242, 45710, 61311, 48420, 60944, 51610, 49062, 54748, 56207, 58826, 47790, 53746, 47818, 56139,
+63794, 57565, 66916, 64764, 42620, 56115, 60570)
+
+#bind
+demographic_df <- cbind(demographic_df, med_income)
+
+med_wealth <- c(83349, 120365, 79785, 78554, 96190, 118180, 147278, 126219, 88938, 78710, 153570, 95389,
+102768, 90247, 108512, 96608, 87998, 86574, 115971, 136853, 148838, 87983, 133224, 75772, 91123, 112580,
+96347, 63224, 148468, 143831, 88135, 100543, 93956, 103615, 87717, 82256, 93621, 113131, 108967, 93925,
+99726, 87508, 78825, 104950, 141716, 119459, 106626, 92262, 111986, 119763)
+
+#bind
+demographic_df <- cbind(demographic_df, med_wealth)
+
+#correct names of 3rd and 4th variable
+names(demographic_df) <- c("State", "B_H_AINA", "med_income", "med_wealth")
+
+#create composite variable (FER)
+
+demographic_df$FER <- (demographic_df$med_income + demographic_df$med_wealth)/2
+
+#remove redundancies
+demographic_df <- dplyr::select(demographic_df, "State", "B_H_AINA", "FER")
+
+#cleanup environment
+rm(med_income, med_wealth)
+
+```
+
+**%EL variable**
+```{r message=FALSE, warning=FALSE}
+#These data are from the National Center for Education Statistics (NCES). The data are retrieved from the following website:
+#https://nces.ed.gov/programs/digest/d19/tables/dt19_204.20.asp
+
+#Import
+EL_df <- read_csv("[filepath]/EL-Data-For-FH-Approach.csv") 
+
+#Clean
+EL_df <- cbind(EL_df[,1], EL_df[,19])
+names(EL_df) <- c("State", "p_EL")
+EL_df <- EL_df %>%
+  slice(5:69) %>%
+  filter(State != "NA") %>%
+  slice(-9) %>%
+  slice(1:50) %>%
+  dplyr::select(p_EL)
+
+#bind
+demographic_df <- cbind(demographic_df, EL_df)
+
+#cleanup environment
+rm(EL_df)
+```
+
+**SQI variable**
+
+The variable, SQI, is measured on a continuous scale with scores ranging 0.0 to 100.0, and reflects the average of states’ “Chance for Success” and “School Finance” ratings. The Chance for Success rating is meant to capture lifelong learning opportunities for students—beginning with early childhood, and progressing through K-12 education into adulthood. The School Finance rating is based on school spending patterns as well as how education dollars are distributed across each state (Education Week Research Center, 2015).
+
+
+The data are gathered from the following website:
+https://www.edweek.org/ew/qc/2015/2015-state-report-cards-map.html?intc=EW-QC15-LFTNAV
+
+
+NB: Hawaii is a single-district jurisdiction. As a result, it is not possible to calculate measures of financial equity, which capture the distribution of funding across districts within a state. Thus Hawaii does not receive a *composite* grade for school finance. Instead, its "Spending" score takes the place of school finance, which is one of the sub-components of the overall school finance measure in other states. 
+
+```{r message=FALSE, warning=FALSE}
+
+chance_for_success <- c(71.2, 76.2, 71.2, 71.0, 72.8, 83.4, 87.5, 78.5, 75.5, 74.3, 80.0, 74.2, 80.1, 76.8, 84.1, 82.7, 75.3, 69.9, 80.0, 85.8, 91.9, 76.1, 87.3, 68.5, 77.4, 77.0, 83.7, 65.6, 89.6, 87.6, 67.2, 80.9, 76.2, 87.5, 76.6, 72.0, 74.8, 82.6, 79.7, 73.3, 78.9, 73.1, 73.4, 80.5, 85.7, 84.9, 80.0, 70.3, 82.6, 82.5)
+
+school_finance <- c(69.7, 81.7, 65.1, 73.1, 67.0, 68.8, 87.1, 83.2, 68.9, 71.2, 81.9, 59.1, 78.7, 73.3, 73.9, 75.5, 73.5, 75.8, 78.7, 86.8, 83.0, 74.6, 75.7, 66.9, 70.7, 71.7, 75.4, 62.8, 78.6, 86.8, 69.0, 88.8, 66.5, 74.3, 76.7, 66.6, 68.9, 82.2, 86.5, 70.8, 66.6, 68.4, 65.5, 61.7, 86.1, 76.9, 71.8, 89.2, 82.0, 89.3)
+
+#bind
+predictors_df <- cbind(demographic_df, chance_for_success, school_finance)
+
+#correct names of last two variables
+names(predictors_df) <- c("State", "B_H_AINA", "FER", "EL", "chance_for_success", "school_finance")
+
+#Create SQI variable
+predictors_df$SQI <- (predictors_df$chance_for_success + predictors_df$school_finance)/2
+
+#remove irrelevant variables from df
+predictors_df <- dplyr::select(predictors_df, State, B_H_AINA, FER, EL, SQI)
+
+#cleanup environment
+rm(demographic_df, chance_for_success, school_finance)
+
+```
+
+**%BA variable**
+
+This variable is operationalized as the percent of adults (25 and older) by state that have earned a bachelor’s or more advanced degree (%BA). 
+
+Data are collected from the American Community Survey. Specifically, the following website:
+
+https://data.census.gov/cedsci/table?d=ACS%205-Year%20Estimates%20Data%20Profiles&table=DP02&tid=ACSDP5Y2015.DP02&y=2015&g=0400000US39,32,31,78,34,33,36,35,38,37,72,30,29,28,21,20,23,22,66,69,25,24,27,26,60,18,17,19,54,10,53,56,12,55,13,16,15,50,51,06,09,08,42,45,44,47,46,05,49,04,48,41,40,02_0100000US&hidePreview=true&t=Educational%20Attainment&tp=true&moe=true
+
+```{r, warning=FALSE, message=FALSE}
+#Import
+Percent_BAplus_df <- read_csv("[filepath]/Percent_BAplus_df.csv")
+
+
+#Merge in %BA variable
+predictors_df <- inner_join(predictors_df, Percent_BAplus_df, by = "State")
+
+#cleanup environment
+rm(Percent_BAplus_df)
+```
+
+**%AA variable**
+
+Gathered from the American Community Survey (ACS), a program of the US Census. Specifically, from this website--
+https://data.census.gov/cedsci/table?t=004%20-%20Black%20or%20African%20American%20alone&tid=ACSSPP1Y2015.S0201&hidePreview=true&g=0400000US02,04,05,06,08,09,10,12,13,15,16,17,18,19,20,21,22,23,24,26,25,27,28,29,31,30,32,33,34,35,36,37,38,39,40,41,42,44,46,01,45,47,48,49,51,50,53,54,55,56&moe=false&tp=true
+
+The data are filtered for the "Black of African American" population across across states. 
+
+NB: This metric for 2015 (1-year estimate), is not available for 12/50 states. The data are simply missing in the ACS data set.
+These states are the following: AK, HI, ID, ME, MT, NH, NM, ND, SD, UT, VT, & WY. These are states in which the prevalence of Black residents is relatively low.
+
+Instead, "5-year" estimates are used for these states. Estimates based on pooling data for these jurisdictions across multiple years. Specifically, from this website--
+https://data.census.gov/cedsci/table?tid=ACSDT5Y2015.B05003B&t=Race%20and%20Ethnicity&vintage=2015&g=0400000US02,15,16,23,30,33,35,38,46,49,50,56&hidePreview=true&tp=false
+
+
+NB: This variable represents an estimate of the proportion of the Black population in each state born in the US. 
+
+```{r, warning=FALSE, message=FALSE}
+#Import data
+Black_df_from_Census <- read_csv("[filepath]/Black_df_from_Census.csv")
+
+#Change from propotion to percent
+Black_df_from_Census$AA <- Black_df_from_Census$AA*100
+
+#Bind AA variable
+predictors_df <- cbind(predictors_df, Black_df_from_Census$AA)
+
+#correct variable names
+names(predictors_df) <- c("State", "B_H_AINA", "FER", "EL", "SQI", "p_BA", "AA")
+
+#Clean up environment
+rm(Black_df_from_Census)
+```
+
+**%MX variable**
+
+The data that form this variable come from the following two Census websites:
+
+https://data.census.gov/cedsci/table?q=Hispanic&g=0400000US39,32,31,78,34,33,36,35,38,37,72,30,29,28,21,20,23,22,66,69,25,24,27,26,60,18,17,19,54,10,53,56,12,55,13,16,15,50,51,06,09,08,42,45,44,47,46,05,49,04,48,41,40,02,01_0100000US&tid=ACSDT1Y2015.B03001&t=Hispanic%20or%20Latino&vintage=2018&hidePreview=true&tp=true
+
+https://data.census.gov/cedsci/table?q=Hispanic&g=0400000US39,32,31,78,34,33,36,35,38,37,72,30,29,28,21,20,23,22,66,69,25,24,27,26,60,18,17,19,54,10,53,56,12,55,13,16,15,50,51,06,09,08,42,45,44,47,46,05,49,04,48,41,40,02,01_0100000US&tid=ACSDT5Y2015.B03001&t=Hispanic%20or%20Latino&vintage=2018&hidePreview=true&tp=true
+
+The former provides one-year estimates and the latter 5-year estimates. There are 7 states (AK, ME, MT, ND, SD, VT, WY) for which 5-year estimates are used. These represent states with relatively small proportions of Hispanics.
+
+```{r, warning=FALSE, message=FALSE}
+#Import data
+Hispanic_df_from_Census <- read_csv("[filepath]/Hispanic_df_from_Census.csv")
+
+#Bind AA variable
+predictors_df <- cbind(predictors_df, Hispanic_df_from_Census$MX)
+
+#cOrrect variable names
+names(predictors_df) <- c("State", "B_H_AINA", "FER", "EL", "SQI", "P_BA", "AA", "MX")
+
+#Clean up environment
+rm(Hispanic_df_from_Census)
+```
+
+**%A variable**
+
+This last predictor variable is the percent of Asian or Pacific Islander grade 8 students by state who identify as Asian but not Pacific Islander (%A) in 2014-15.
+
+One limitation: PI data not available for NEw YORK in 2014-15 (nor in adjacent years; 2013-14 or 2015-16). The data for NY represent grade 10 students in 2016-17 (so still the same target cohort.)  
+
+```{r, warning=FALSE, message=FALSE}
+#Import data
+API_df <- read_csv("[filepath]/API_df_from_CCD.csv") %>%
+  slice(6:57) 
+
+#Remove DC
+API_df <- API_df[-10,]
+
+#Change class of certain variables
+API_df <- apply(API_df[,2:5], 2, as.numeric)
+
+#Remove first (left over) line
+API_df <- API_df[-1,]
+
+#Define API_df as a data frame
+API_df <- as.data.frame(API_df)
+
+#Create "API" and "PI" variables
+API_df$API <- API_df$X2 + API_df$X3
+API_df$PI <- API_df$X4 + API_df$X5
+
+#Create %A variable 
+API_df$A <- 1-(API_df$PI/API_df$API)
+options(digits = 3)
+API_df$A <- API_df$A*100
+
+#Bind A variable
+predictors_df <- cbind(predictors_df, API_df$A)
+
+#cOrrect variable names
+names(predictors_df) <- c("State", "B_H_AINA", "FER", "p_EL", "SQI", "p_BA", "AA", "MX", "A")
+
+#Clean up environment
+rm(API_df)
+```
+
+**Tidy up predictors dataset**
+
+```{r}
+
+#Make sure all values are rounded to the nearest tenth (one decimal)
+predictors_df$B_H_AINA<- format(round(predictors_df$B_H_AINA), nsmall=1)
+predictors_df$AA <- format(round(predictors_df$AA), nsmall=1)
+predictors_df$MX <- format(round(predictors_df$MX), nsmall=1)
+
+#make sure all predictor variables are numeric
+predictors_df[, 2:9] <- apply(predictors_df[, 2:9], 2, as.numeric)
+
+```
+
+### Combine direct estimate data and state-level predictors
+```{r warning=FALSE, message=FALSE}
+#import de_dfs
+de_dfs <- read_csv("[filepath]/de_dfs.csv")
+de_dfs <- de_dfs[,-1]
+
+FH_df <- full_join(de_dfs, predictors_df)
+
+#make sure merged dataset is 50 rows long
+```
+
+### Merge NAEP reported estimates of mean math achievent into the data set
+
+```{r warning=FALSE, message=FALSE}
+#Import the NAEP-reported means and standard errors for target values
+NR_TV_Mean_SE <- read_csv("[filepath]/NR_TV_Mean_SE.csv")
+
+#use full join
+
+FH_df <- full_join(FH_df, NR_TV_Mean_SE, by = "State")
+
+#verify that are still only 50 rows
+
+#Export (save) FH_df
+write.csv(FH_df, "[filepath]/FH-DF.csv")
+```
+
+### Execute FH
+
+NHS
+```{r warning=FALSE, message=FALSE}
+options(digits = 5)
+
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 30] <- FH_df1[x, 2] #30 corresponds with NR_NHS_Mean, 2 with NHS_direct_est
+	FH_df1[x, 31] <- FH_df1[x, 3] #31 corresponds with NR_NHS_SE, 3 with NHS_se
+	FH_df1 <- filter(FH_df1, NR_NHS_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_NHS_Mean ~ B_H_AINA + FER + p_EL + SQI, NR_NHS_SE^2) #line changes per subgroup
+}
+
+NHS_FH_results <- lapply(1:length(FH_df$NR_NHS_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from NHS_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  NHS_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+NHS_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+NHS_eblups <- t(as.data.frame(NHS_eblups))
+rownames(NHS_eblups) <- c()
+NHS_eblups <- as.data.frame(NHS_eblups)
+names(NHS_eblups) <- c("NHS eblups")
+
+
+########################################################################################
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  NHS_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+NHS_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+NHS_eblup_se <- t(as.data.frame(NHS_eblup_se))
+rownames(NHS_eblup_se) <- c()
+NHS_eblup_se <- as.data.frame(NHS_eblup_se)
+names(NHS_eblup_se) <- c("NHS_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+NHS_NR <- 
+  read_csv("[filepath]/NHS.csv") %>%
+  filter(Mean != "NA")
+NHS_FH_results <- cbind(NHS_NR$State, NHS_eblups, NHS_eblup_se)
+names(NHS_FH_results) <- c("State", "NHS_eblups", "NHS_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+NHS_FH_results$NHS_eblup_se <- sqrt(NHS_FH_results$NHS_eblup_se)
+```
+
+HS
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 32] <- FH_df1[x, 4] #32 corresponds with NR_HS_Mean, 4 with HS_direct_est
+	FH_df1[x, 33] <- FH_df1[x, 5] #33 corresponds with NR_HS_SE, 5 with HS_se
+	FH_df1 <- filter(FH_df1, NR_HS_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_HS_Mean ~ B_H_AINA + FER + p_EL + SQI, NR_HS_SE^2) #line changes per subgroup
+}
+
+HS_FH_results <- lapply(1:length(FH_df$NR_HS_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from HS_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  HS_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+HS_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+HS_eblups <- t(as.data.frame(HS_eblups))
+rownames(HS_eblups) <- c()
+HS_eblups <- as.data.frame(HS_eblups)
+names(HS_eblups) <- c("HS eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  HS_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+HS_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+HS_eblup_se <- t(as.data.frame(HS_eblup_se))
+rownames(HS_eblup_se) <- c()
+HS_eblup_se <- as.data.frame(HS_eblup_se)
+names(HS_eblup_se) <- c("HS_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+HS_NR <- 
+  read_csv("[filepath]/HS.csv") %>%
+  filter(Mean != "NA")
+HS_FH_results <- cbind(HS_NR$State, HS_eblups, HS_eblup_se)
+names(HS_FH_results) <- c("State", "HS_eblups", "HS_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+HS_FH_results$HS_eblup_se <- sqrt(HS_FH_results$HS_eblup_se)
+```
+
+SBA
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 34] <- FH_df1[x, 6] #34 corresponds with NR_SBA_Mean, 6 with SBA_direct_est
+	FH_df1[x, 35] <- FH_df1[x, 7] #35 corresponds with NR_SBA_SE, 7 with SBA_se
+	FH_df1 <- filter(FH_df1, NR_SBA_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_SBA_Mean ~ B_H_AINA + FER + p_EL + SQI, NR_SBA_SE^2) #line changes per subgroup
+}
+
+SBA_FH_results <- lapply(1:length(FH_df$NR_SBA_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from SBA_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  SBA_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+SBA_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+SBA_eblups <- t(as.data.frame(SBA_eblups))
+rownames(SBA_eblups) <- c()
+SBA_eblups <- as.data.frame(SBA_eblups)
+names(SBA_eblups) <- c("SBA eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  SBA_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+SBA_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+SBA_eblup_se <- t(as.data.frame(SBA_eblup_se))
+rownames(SBA_eblup_se) <- c()
+SBA_eblup_se <- as.data.frame(SBA_eblup_se)
+names(SBA_eblup_se) <- c("SBA_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+SBA_NR <- 
+  read_csv("[filepath]/SBA.csv") %>%
+  filter(Mean != "NA")
+SBA_FH_results <- cbind(SBA_NR$State, SBA_eblups, SBA_eblup_se)
+names(SBA_FH_results) <- c("State", "SBA_eblups", "SBA_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+SBA_FH_results$SBA_eblup_se <- sqrt(SBA_FH_results$SBA_eblup_se)
+```
+
+BA
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 36] <- FH_df1[x, 8] #36 corresponds with NR_BA_Mean, 8 with BA_direct_est
+	FH_df1[x, 37] <- FH_df1[x, 9] #37 corresponds with NR_BA_SE, 9 with BA_se
+	FH_df1 <- filter(FH_df1, NR_BA_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_BA_Mean ~ B_H_AINA + FER + p_EL + SQI, NR_BA_SE^2) #line changes per subgroup
+}
+
+BA_FH_results <- lapply(1:length(FH_df$NR_BA_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from BA_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  BA_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+BA_eblups <- lapply(1:48, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+BA_eblups <- t(as.data.frame(BA_eblups))
+rownames(BA_eblups) <- c()
+BA_eblups <- as.data.frame(BA_eblups)
+names(BA_eblups) <- c("BA eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  BA_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+BA_eblup_se <- lapply(1:48, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+BA_eblup_se <- t(as.data.frame(BA_eblup_se))
+rownames(BA_eblup_se) <- c()
+BA_eblup_se <- as.data.frame(BA_eblup_se)
+names(BA_eblup_se) <- c("BA_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+BA_NR <- 
+  read_csv("[filepath]/BA.csv") %>%
+  filter(Mean != "NA")
+BA_FH_results <- cbind(BA_NR$State, BA_eblups, BA_eblup_se)
+names(BA_FH_results) <- c("State", "BA_eblups", "BA_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+BA_FH_results$BA_eblup_se <- sqrt(BA_FH_results$BA_eblup_se)
+
+```
+
+
+B
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 38] <- FH_df1[x, 10] #38 corresponds with NR_B_Mean, 10 with B_direct_est
+	FH_df1[x, 39] <- FH_df1[x, 11] #39 corresponds with NR_B_SE, 11 with B_se
+	FH_df1 <- filter(FH_df1, NR_B_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_B_Mean ~ p_BA + FER + SQI + AA, NR_B_SE^2) #line changes per subgroup
+}
+
+B_FH_results <- lapply(1:length(FH_df$NR_B_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from B_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  B_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+B_eblups <- lapply(1:39, get_eblup) #line changes per subgroup
+
+
+#Wrangle eblups into data frame and long format
+B_eblups <- t(as.data.frame(B_eblups))
+rownames(B_eblups) <- c()
+B_eblups <- as.data.frame(B_eblups)
+names(B_eblups) <- c("B eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  B_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+B_eblup_se <- lapply(1:39, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+B_eblup_se <- t(as.data.frame(B_eblup_se))
+rownames(B_eblup_se) <- c()
+B_eblup_se <- as.data.frame(B_eblup_se)
+names(B_eblup_se) <- c("B_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+B_NR <- 
+  read_csv("[filepath]/B.csv") %>%
+  filter(Mean != "NA")
+B_FH_results <- cbind(B_NR$State, B_eblups, B_eblup_se)
+names(B_FH_results) <- c("State", "B_eblups", "B_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+B_FH_results$B_eblup_se <- sqrt(B_FH_results$B_eblup_se)
+```
+
+H 
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 40] <- FH_df1[x, 12] #40 corresponds with NR_H_Mean, 12 with H_direct_est
+	FH_df1[x, 41] <- FH_df1[x, 13] #41 corresponds with NR_H_SE, 13 with H_se
+	FH_df1 <- filter(FH_df1, NR_H_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_H_Mean ~ p_BA + FER + p_EL + SQI + MX, NR_H_SE^2) #line changes per subgroup
+}
+
+H_FH_results <- lapply(1:length(FH_df$NR_H_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from H_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  H_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+H_eblups <- lapply(1:47, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+H_eblups <- t(as.data.frame(H_eblups))
+rownames(H_eblups) <- c()
+H_eblups <- as.data.frame(H_eblups)
+names(H_eblups) <- c("H eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  H_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+H_eblup_se <- lapply(1:47, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+H_eblup_se <- t(as.data.frame(H_eblup_se))
+rownames(H_eblup_se) <- c()
+H_eblup_se <- as.data.frame(H_eblup_se)
+names(H_eblup_se) <- c("H_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+H_NR <- 
+  read_csv("[filepath]/H.csv") %>%
+  filter(Mean != "NA")
+H_FH_results <- cbind(H_NR$State, H_eblups, H_eblup_se)
+names(H_FH_results) <- c("State", "H_eblups", "H_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+H_FH_results$H_eblup_se <- sqrt(H_FH_results$H_eblup_se)
+```
+
+API 
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 42] <- FH_df1[x, 14] #42 corresponds with NR_API_Mean, 14 with API_direct_est
+	FH_df1[x, 43] <- FH_df1[x, 15] #43 corresponds with NR_API_SE, 15 with API_se
+	FH_df1 <- filter(FH_df1, NR_API_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_API_Mean ~ p_BA + FER + p_EL + SQI + A, NR_API_SE^2) #line changes per subgroup
+}
+
+API_FH_results <- lapply(1:length(FH_df$NR_API_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from API_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  API_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+API_eblups <- lapply(1:30, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+API_eblups <- t(as.data.frame(API_eblups))
+rownames(API_eblups) <- c()
+API_eblups <- as.data.frame(API_eblups)
+names(API_eblups) <- c("API eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  API_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+API_eblup_se <- lapply(1:30, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+API_eblup_se <- t(as.data.frame(API_eblup_se))
+rownames(API_eblup_se) <- c()
+API_eblup_se <- as.data.frame(API_eblup_se)
+names(API_eblup_se) <- c("API_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+API_NR <- 
+  read_csv("[filepath]/API.csv") %>%
+  filter(Mean != "NA")
+API_FH_results <- cbind(API_NR$State, API_eblups, API_eblup_se)
+names(API_FH_results) <- c("State", "API_eblups", "API_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+API_FH_results$API_eblup_se <- sqrt(API_FH_results$API_eblup_se)
+```
+
+AINA 
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 44] <- FH_df1[x, 16] #44 corresponds with NR_AINA_Mean, 16 with AINA_direct_est
+	FH_df1[x, 45] <- FH_df1[x, 17] #45 corresponds with NR_AINA_SE, 17 with AINA_se
+	FH_df1 <- filter(FH_df1, NR_AINA_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_AINA_Mean ~ p_BA + FER, NR_AINA_SE^2) #line changes per subgroup
+}
+
+AINA_FH_results <- lapply(1:length(FH_df$NR_AINA_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from AINA_FH_results (saved as a list object)
+###########################################################################
+
+
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  AINA_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+AINA_eblups <- lapply(1:13, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+AINA_eblups <- t(as.data.frame(AINA_eblups))
+rownames(AINA_eblups) <- c()
+AINA_eblups <- as.data.frame(AINA_eblups)
+names(AINA_eblups) <- c("AINA eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  AINA_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+AINA_eblup_se <- lapply(1:13, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+AINA_eblup_se <- t(as.data.frame(AINA_eblup_se))
+rownames(AINA_eblup_se) <- c()
+AINA_eblup_se <- as.data.frame(AINA_eblup_se)
+names(AINA_eblup_se) <- c("AINA_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+AINA_NR <- 
+  read_csv("[filepath]/AINA.csv") %>%
+  filter(Mean != "NA")
+AINA_FH_results <- cbind(AINA_NR$State, AINA_eblups, AINA_eblup_se)
+names(AINA_FH_results) <- c("State", "AINA_eblups", "AINA_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+AINA_FH_results$AINA_eblup_se <- sqrt(AINA_FH_results$AINA_eblup_se)
+```
+
+TP
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 46] <- FH_df1[x, 18] #46 corresponds with NR_TP_Mean, 18 with TP_direct_est
+	FH_df1[x, 47] <- FH_df1[x, 19] #47 corresponds with NR_TP_SE, 19 with TP_se
+	FH_df1 <- filter(FH_df1, NR_TP_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_TP_Mean ~ p_BA + B_H_AINA + FER + SQI, NR_TP_SE^2) #line changes per subgroup
+}
+
+TP_FH_results <- lapply(1:length(FH_df$NR_TP_Mean), FH_procedure)
+
+
+
+
+###########################################################################
+# Extract the data of interest from TP_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  TP_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+TP_eblups <- lapply(1:24, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+TP_eblups <- t(as.data.frame(TP_eblups))
+rownames(TP_eblups) <- c()
+TP_eblups <- as.data.frame(TP_eblups)
+names(TP_eblups) <- c("TP eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  TP_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+TP_eblup_se <- lapply(1:24, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+TP_eblup_se <- t(as.data.frame(TP_eblup_se))
+rownames(TP_eblup_se) <- c()
+TP_eblup_se <- as.data.frame(TP_eblup_se)
+names(TP_eblup_se) <- c("TP_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+TP_NR <- 
+  read_csv("[filepath]/2+.csv") %>%
+  filter(Mean != "NA")
+TP_FH_results <- cbind(TP_NR$State, TP_eblups, TP_eblup_se)
+names(TP_FH_results) <- c("State", "TP_eblups", "TP_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+TP_FH_results$TP_eblup_se <- sqrt(TP_FH_results$TP_eblup_se)
+```
+
+EL
+```{r warning=FALSE, message=FALSE}
+FH_procedure <- function(x){
+	FH_df1 <- FH_df
+	FH_df1[x, 48] <- FH_df1[x, 20] #48 corresponds with NR_EL_Mean, 20 with EL_direct_est
+	FH_df1[x, 49] <- FH_df1[x, 21] #49 corresponds with NR_EL_SE, 21 with EL_se
+	FH_df1 <- filter(FH_df1, NR_EL_Mean != "NA") #drops non target value rows
+	attach(FH_df1)
+	mseFH(NR_EL_Mean ~ B_H_AINA + FER + SQI, NR_EL_SE^2) #line changes per subgroup
+}
+
+EL_FH_results <- lapply(1:length(FH_df$NR_EL_Mean), FH_procedure)
+
+
+###########################################################################
+# Extract the data of interest from EL_FH_results (saved as a list object)
+###########################################################################
+
+#Set up function to automate extraction of eblups
+get_eblup <- function(x){
+  EL_FH_results[[x]]$est$eblup[x]
+}
+
+#Automate with lapply
+EL_eblups <- lapply(1:31, get_eblup) #line changes per subgroup
+
+#Wrangle eblups into data frame and long format
+EL_eblups <- t(as.data.frame(EL_eblups))
+rownames(EL_eblups) <- c()
+EL_eblups <- as.data.frame(EL_eblups)
+names(EL_eblups) <- c("EL eblups")
+
+
+########################################################################################
+
+
+#Set up function to automate extraction of mse values for eblups
+get_mse <- function(x){
+  EL_FH_results[[x]]$mse[x]
+}
+
+#Automate with lapply
+EL_eblup_se <- lapply(1:31, get_mse) #line changes per subgroup
+
+#Wrangle eblup MSEs into data frame and long format
+EL_eblup_se <- t(as.data.frame(EL_eblup_se))
+rownames(EL_eblup_se) <- c()
+EL_eblup_se <- as.data.frame(EL_eblup_se)
+names(EL_eblup_se) <- c("EL_eblup_se")
+
+#Bind eblup and mse values, along with their corresponding state acronyms (in first column)
+EL_NR <- 
+  read_csv("[filepath]/EL.csv") %>%
+  filter(Mean != "NA")
+EL_FH_results <- cbind(EL_NR$State, EL_eblups, EL_eblup_se)
+names(EL_FH_results) <- c("State", "EL_eblups", "EL_eblup_se")
+
+#One last step to make sure the _se variable actually includes standard errors (not mean squared errors)
+EL_FH_results$EL_eblup_se <- sqrt(EL_FH_results$EL_eblup_se)
+```
+
+### Export and prepare estimates for calculating accuracy statistics 
+```{r warning=FALSE, message=FALSE}
+#NHS
+write.csv(NHS_FH_results, "[filepath]/NHS-FH-ESTIMATES.csv")
+
+#HS
+write.csv(HS_FH_results, "[filepath]/HS-FH-ESTIMATES.csv")
+
+#SBA
+write.csv(SBA_FH_results, "[filepath]/SBA-FH-ESTIMATES.csv")
+
+#BA
+write.csv(BA_FH_results, "[filepath]/BA-FH-ESTIMATES.csv")
+
+#B
+write.csv(B_FH_results, "[filepath]/B-FH-ESTIMATES.csv")
+
+#H
+write.csv(H_FH_results, "[filepath]/H-FH-ESTIMATES.csv")
+
+#API
+write.csv(API_FH_results, "[filepath]/API-FH-ESTIMATES.csv")
+
+#AINA
+write.csv(AINA_FH_results, "[filepath]/AINA-FH-ESTIMATES.csv")
+
+#TP
+write.csv(TP_FH_results, "[filepath]/TP-FH-ESTIMATES.csv")
+
+#EL
+write.csv(EL_FH_results, "[filepath]/EL-FH-ESTIMATES.csv")
+```
+
+### Calculate wMAE for FH technique
+
+**Free up memory**
+
+```{r warning=FALSE, message=FALSE}
+
+rm(list = ls())
+```
+
+
+**Define a wMAE function**
+```{r warning=FALSE, message=FALSE}
+wmae <- function(x){
+  w_abs_errors <- abs(x[,2] - x[,4])/x[,3]
+  mean(w_abs_errors[,1])
+}
+```
+
+NHS
+```{r warning=FALSE, message=FALSE}
+#Import/Wrangle predicted and observed data
+
+NHS_predicted <- read_csv("[filepath]/NHS-FH-ESTIMATES.csv")
+NHS_predicted <- NHS_predicted[,-1]
+names(NHS_predicted) <- c("State", "FH_mean", "FH_se")
+
+NHS_observed <- read_csv("[filepath]/NHS.csv")
+NHS_observed <- NHS_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+NHS <- inner_join(NHS_observed, NHS_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(NHS)
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+#Make NHS tidy
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(NHS$State, source, NHS$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+source <- rep(c("FH"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(NHS$State, source, NHS$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+NHS_tidy <- rbind(part1, part2)
+NHS_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+NHS_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+NHS_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+
+HS
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+HS_predicted <- read_csv("[filepath]/HS-FH-ESTIMATES.csv")
+HS_predicted <- HS_predicted[,-1]
+names(HS_predicted) <- c("State", "FH_mean", "FH_se")
+
+HS_observed <- read_csv("[filepath]/HS.csv")
+HS_observed <- HS_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+HS <- inner_join(HS_observed, HS_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(HS)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make HS tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(HS$State, source, HS$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(HS$State, source, HS$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+HS_tidy <- rbind(part1, part2)
+
+HS_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+HS_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+HS_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+SBA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+SBA_predicted <- read_csv("[filepath]/SBA-FH-ESTIMATES.csv")
+SBA_predicted <- SBA_predicted[,-1]
+names(SBA_predicted) <- c("State", "FH_mean", "FH_se")
+
+SBA_observed <- read_csv("[filepath]/SBA.csv")
+SBA_observed <- SBA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+SBA <- inner_join(SBA_observed, SBA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(SBA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make SBA tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(SBA$State, source, SBA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(SBA$State, source, SBA$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+SBA_tidy <- rbind(part1, part2)
+
+SBA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+SBA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+SBA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+
+BA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+BA_predicted <- read_csv("[filepath]/BA-FH-ESTIMATES.csv")
+BA_predicted <- BA_predicted[,-1]
+names(BA_predicted) <- c("State", "FH_mean", "FH_se")
+
+BA_observed <- read_csv("[filepath]/BA.csv")
+BA_observed <- BA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+BA <- inner_join(BA_observed, BA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(BA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make BA tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(BA$State, source, BA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(BA$State, source, BA$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+BA_tidy <- rbind(part1, part2)
+
+BA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+BA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+BA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+B
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+B_predicted <- read_csv("[filepath]/B-FH-ESTIMATES.csv")
+B_predicted <- B_predicted[,-1]
+names(B_predicted) <- c("State", "FH_mean", "FH_se")
+
+B_observed <- read_csv("[filepath]/B.csv")
+B_observed <- B_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+B <- inner_join(B_observed, B_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(B)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r message=FALSE, warning=FALSE}
+
+#Make B tidy
+
+source <- rep(c("NAEP"), 39)
+source <- as.data.frame(source)
+part1 <- cbind(B$State, source, B$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 39)
+source <- as.data.frame(source)
+part2 <- cbind(B$State, source, B$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+B_tidy <- rbind(part1, part2)
+
+B_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+B_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+B_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+
+H
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+H_predicted <- read_csv("[filepath]/H-FH-ESTIMATES.csv")
+H_predicted <- H_predicted[,-1]
+names(H_predicted) <- c("State", "FH_mean", "FH_se")
+
+H_observed <- read_csv("[filepath]/H.csv")
+H_observed <- H_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+H <- inner_join(H_observed, H_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(H)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make H tidy
+
+source <- rep(c("NAEP"), 47)
+source <- as.data.frame(source)
+part1 <- cbind(H$State, source, H$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 47)
+source <- as.data.frame(source)
+part2 <- cbind(H$State, source, H$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+H_tidy <- rbind(part1, part2)
+
+H_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+H_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+H_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+```
+
+
+API
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+API_predicted <- read_csv("[filepath]/API-FH-ESTIMATES.csv")
+API_predicted <- API_predicted[,-1] 
+names(API_predicted) <- c("State", "FH_mean", "FH_se")
+
+API_observed <- read_csv("[filepath]/API.csv")
+API_observed <- API_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+API <- inner_join(API_observed, API_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")                    
+wmae(API)
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make API tidy
+
+source <- rep(c("NAEP"), 30)
+source <- as.data.frame(source)
+part1 <- cbind(API$State, source, API$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 30)
+source <- as.data.frame(source)
+part2 <- cbind(API$State, source, API$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+API_tidy <- rbind(part1, part2)
+
+API_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+API_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+API_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+```
+
+
+
+AINA
+```{r message=FALSE, warning=FALSE}
+#Import/Wrangle predicted and observed data
+AINA_predicted <- read_csv("[filepath]/AINA-FH-ESTIMATES.csv")
+AINA_predicted <- AINA_predicted[,-1] 
+names(AINA_predicted) <- c("State", "FH_mean", "FH_se")
+
+AINA_observed <- read_csv("[filepath]/AINA.csv")
+AINA_observed <- AINA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+AINA <- inner_join(AINA_observed, AINA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(AINA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make AINA tidy
+
+source <- rep(c("NAEP"), 13)
+source <- as.data.frame(source)
+part1 <- cbind(AINA$State, source, AINA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 13)
+source <- as.data.frame(source)
+part2 <- cbind(AINA$State, source, AINA$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+AINA_tidy <- rbind(part1, part2)
+
+AINA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+AINA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+AINA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+
+TP
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+TP_predicted <- read_csv("[filepath]/TP-FH-ESTIMATES.csv")
+TP_predicted <- TP_predicted[,-1]
+names(TP_predicted) <- c("State", "FH_mean", "FH_se")
+
+TP_observed <- read_csv("[filepath]/2+.csv")
+TP_observed <- TP_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+TP <- inner_join(TP_observed, TP_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(TP)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make TP tidy
+
+source <- rep(c("NAEP"), 24)
+source <- as.data.frame(source)
+part1 <- cbind(TP$State, source, TP$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 24)
+source <- as.data.frame(source)
+part2 <- cbind(TP$State, source, TP$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+TP_tidy <- rbind(part1, part2)
+
+TP_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+TP_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+TP_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+
+EL
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+
+EL_predicted <- read_csv("[filepath]/EL-FH-ESTIMATES.csv")
+EL_predicted <- EL_predicted[,-1] 
+names(EL_predicted) <- c("State", "FH_mean", "FH_se")
+
+EL_observed <- read_csv("[filepath]/EL.csv")
+EL_observed <- EL_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+EL <- inner_join(EL_observed, EL_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(EL)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make EL tidy
+
+source <- rep(c("NAEP"), 31)
+source <- as.data.frame(source)
+part1 <- cbind(EL$State, source, EL$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("FH"), 31)
+source <- as.data.frame(source)
+part2 <- cbind(EL$State, source, EL$FH_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+EL_tidy <- rbind(part1, part2)
+
+EL_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+EL_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+EL_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+```
+
+**Overall**
+```{r message=FALSE, warning=FALSE}
+
+#Row bind subgroup datasets into an "overall dataset"
+overall <- rbind(NHS, HS, SBA, BA, B, H, API, AINA, TP, EL)
+
+#Calculate wMAE for FH across subgroups                         
+wmae(overall)
+
+```
+
+### Calculate Coverage for FH Technique
+
+First, add the median of the NAEP-reported state-level standard deviations to each respective subgroup's data set (this permits calculation of the b-statistic).
+
+```{r message=FALSE, warning=FALSE}
+
+NHS$median_sd <- 31.5
+HS$median_sd <- 32.6
+SBA$median_sd <- 30.6
+BA$median_sd <- 34.4
+B$median_sd <- 33.4
+H$median_sd <- 34.0
+API$median_sd <- 38.1
+AINA$median_sd <- 35.4
+TP$median_sd <- 35.2
+EL$median_sd <- 33.3
+
+```
+
+**By subgroup**
+NHS
+```{r message=FALSE, warning=FALSE}
+NHS$b_statisic <- abs(NHS$NAEP_mean-NHS$FH_mean)/NHS$median_sd
+mean(NHS$b_statisic <= 0.20)
+```
+
+NHS-visual
+```{r message=FALSE, warning=FALSE}
+NHS$lowerbound <- NHS$NAEP_mean - 0.2*NHS$median_sd
+NHS$upperbound <- NHS$NAEP_mean + 0.2*NHS$median_sd
+NHS <- NHS %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+ggplot() +
+  geom_errorbar(data = NHS, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = NHS, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+HS
+```{r message=FALSE, warning=FALSE}
+HS$b_statisic <- abs(HS$NAEP_mean-HS$FH_mean)/HS$median_sd
+mean(HS$b_statisic <= 0.20)
+
+```
+HS-visual
+```{r message=FALSE, warning=FALSE}
+HS$lowerbound <- HS$NAEP_mean - 0.2*HS$median_sd
+HS$upperbound <- HS$NAEP_mean + 0.2*HS$median_sd
+HS <- HS %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+ggplot() +
+  geom_errorbar(data = HS, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = HS, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+
+SBA
+```{r message=FALSE, warning=FALSE}
+SBA$b_statisic <- abs(SBA$NAEP_mean-SBA$FH_mean)/SBA$median_sd
+mean(SBA$b_statisic <= 0.20)
+
+```
+SBA-visual
+```{r message=FALSE, warning=FALSE}
+
+SBA$lowerbound <- SBA$NAEP_mean - 0.2*SBA$median_sd
+SBA$upperbound <- SBA$NAEP_mean + 0.2*SBA$median_sd
+
+SBA <- SBA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = SBA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = SBA, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+BA
+```{r message=FALSE, warning=FALSE}
+BA$b_statisic <- abs(BA$NAEP_mean-BA$FH_mean)/BA$median_sd
+mean(BA$b_statisic <= 0.20)
+```
+BA-visual
+```{r message=FALSE, warning=FALSE}
+
+BA$lowerbound <- BA$NAEP_mean - 0.2*BA$median_sd
+BA$upperbound <- BA$NAEP_mean + 0.2*BA$median_sd
+
+BA <- BA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = BA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = BA, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+B
+```{r message=FALSE, warning=FALSE}
+B$b_statisic <- abs(B$NAEP_mean-B$FH_mean)/B$median_sd
+mean(B$b_statisic <= 0.20)
+```
+B-visual
+```{r message=FALSE, warning=FALSE}
+
+B$lowerbound <- B$NAEP_mean - 0.2*B$median_sd
+B$upperbound <- B$NAEP_mean + 0.2*B$median_sd
+
+B <- B %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = B, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = B, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+H
+```{r message=FALSE, warning=FALSE}
+H$b_statisic <- abs(H$NAEP_mean-H$FH_mean)/H$median_sd
+mean(H$b_statisic <= 0.20)
+```
+H-visual
+```{r message=FALSE, warning=FALSE}
+H$lowerbound <- H$NAEP_mean - 0.2*H$median_sd
+H$upperbound <- H$NAEP_mean + 0.2*H$median_sd
+H <- H %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+ggplot() +
+  geom_errorbar(data = H, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = H, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+
+API
+```{r message=FALSE, warning=FALSE}
+
+API$b_statisic <- abs(API$NAEP_mean-API$FH_mean)/API$median_sd
+mean(API$b_statisic <= 0.20)
+
+```
+
+API-visual
+```{r message=FALSE, warning=FALSE}
+
+API$lowerbound <- API$NAEP_mean - 0.2*API$median_sd
+API$upperbound <- API$NAEP_mean + 0.2*API$median_sd
+
+API <- API %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = API, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = API, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+AINA
+```{r message=FALSE, warning=FALSE}
+
+AINA$b_statisic <- abs(AINA$NAEP_mean-AINA$FH_mean)/AINA$median_sd
+mean(AINA$b_statisic <= 0.20)
+
+```
+
+
+AINA-visual
+```{r message=FALSE, warning=FALSE}
+
+AINA$lowerbound <- AINA$NAEP_mean - 0.2*AINA$median_sd
+AINA$upperbound <- AINA$NAEP_mean + 0.2*AINA$median_sd
+
+AINA <- AINA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = AINA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = AINA, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+TP (2+)
+```{r message=FALSE, warning=FALSE}
+TP$b_statisic <- abs(TP$NAEP_mean-TP$FH_mean)/TP$median_sd
+mean(TP$b_statisic <= 0.20)
+```
+
+TP-visual
+```{r message=FALSE, warning=FALSE}
+TP$lowerbound <- TP$NAEP_mean - 0.2*TP$median_sd
+TP$upperbound <- TP$NAEP_mean + 0.2*TP$median_sd
+TP <- TP %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+ggplot() +
+  geom_errorbar(data = TP, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = TP, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+
+EL
+```{r message=FALSE, warning=FALSE}
+EL$b_statisic <- abs(EL$NAEP_mean-EL$FH_mean)/EL$median_sd
+mean(EL$b_statisic <= 0.20)
+```
+
+EL-visual
+```{r message=FALSE, warning=FALSE}
+EL$lowerbound <- EL$NAEP_mean - 0.2*EL$median_sd
+EL$upperbound <- EL$NAEP_mean + 0.2*EL$median_sd
+EL <- EL %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+ggplot() +
+  geom_errorbar(data = EL, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = EL, aes(FH_mean, State, col = "FH prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+
+**Overall**
+Row bind datasets
+```{r message=FALSE, warning=FALSE}
+#Row bind subgroup datasets into an "overall dataset"
+overall <- rbind(NHS, HS, SBA, BA, B, H, API, AINA, TP, EL)
+#Calculate coverage across groups
+mean(overall$b_statisic <= 0.20)
+```

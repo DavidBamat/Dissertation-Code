@@ -1,0 +1,3008 @@
+---
+title: "Chapter 4.1 Script MICE Procedure"
+author: "David B"
+output: html_document
+---
+
+### Install/Load packages
+```{r, message=FALSE, warning=FALSE}
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(mice)) install.packages("mice", repos = "http://cran.us.r-project.org")
+if(!require(matrixStats)) install.packages("matrixStats", repos = "http://cran.us.r-project.org")
+if(!require(extrafont)) install.packages("extrafont", repos = "http://cran.us.r-project.org")
+loadfonts(device="win") #for loading fonts from "extrafont" package
+
+```
+
+### Import test sample (& some data manipulation)
+```{r, message=FALSE, warning=FALSE}
+
+df <- read_csv("[filepath]/TestSampleAchievement.csv")
+
+#Change variable name of "2+" for compatibility with mice function
+df <- rename(df, "TP" = "2+")
+
+#Remove state variable (column)
+df_mice <- df[, -1]
+
+```
+
+### Define Visiting Sequence
+```{r, message=FALSE, warning=FALSE}
+
+vis <- c("API", "TP", "BA", "SBA", "HS", "B", "NHS", "H", "AINA", "EL")
+
+```
+
+### Construct Predictor Matrix
+```{r, message=FALSE, warning=FALSE}
+
+for_pred_matrix <- mice(df_mice, maxit = 0, print=F) #Enables creation a predictor matrix, which will be subsequently edited
+pred_matrix <- for_pred_matrix$pred #Creates an initial data matrix with 0s along the diagonal and 1s everywhere else
+
+#Next sets of code remove 1s where I do not want corresponding columns to predict rows
+
+pred_matrix[1:2, ] <- 0
+pred_matrix[7, ] <- 0
+pred_matrix[14:18, ] <- 0
+#these three lines assign 0s to columns for rows without missing data
+
+pred_matrix[3, 2] <- 0
+pred_matrix[3, 10] <- 0
+pred_matrix[3, 12:13] <- 0
+pred_matrix[3, 15:18] <- 0
+#These four lines assign 0s to select columns in the NHS row
+
+pred_matrix[4, 7:13] <- 0
+pred_matrix[4, 15] <- 0
+#These two lines assign 0s to select columns in the HS row
+
+pred_matrix[5, 7:13] <- 0
+pred_matrix[5, 15] <- 0
+#These two lines assign 0s to select columns in the SBA row
+
+pred_matrix[6, 3] <- 0
+pred_matrix[6, 8:13] <- 0
+pred_matrix[6, 15] <- 0
+#These three lines assign 0s to select columns from the BA row
+
+pred_matrix[8, 2] <- 0
+pred_matrix[8, 5:6] <- 0
+pred_matrix[8, 10:18] <- 0
+#These three lines assign 0s to select cloumns from the B row
+
+pred_matrix[9, 1:2] <- 0
+pred_matrix[9, 4:7] <- 0
+pred_matrix[9, 10:12] <- 0
+pred_matrix[9, 14:18] <- 0
+#These four lines assign 0s to select columns from the H row
+
+pred_matrix[10, 1] <- 0
+pred_matrix[10, 3:9] <- 0
+pred_matrix[10, 11:14] <- 0
+pred_matrix[10, 16:18] <- 0
+#These three lines assign 0s to select columns from the API row
+
+pred_matrix[11, 1:9] <- 0
+pred_matrix[11, 12] <- 0
+pred_matrix[11, 14:18] <- 0
+#These three lines assign 0s to select columns from the AINA row
+
+pred_matrix[12, 1:6] <- 0
+pred_matrix[12, 8:11] <- 0
+pred_matrix[12, 13] <- 0
+pred_matrix[12, 15:18] <- 0
+#These three lines assign 0s to select columns fron the 2+ (TP) row
+
+pred_matrix[13, 1:8] <- 0
+pred_matrix[13, 10] <- 0
+pred_matrix[13, 12] <- 0
+pred_matrix[13, 14:18] <- 0
+#These four lines assign 0s to select columns from the EL row
+
+```
+
+### Execute MICE procedure
+
+**NHS**
+```{r, message=FALSE, warning=FALSE}
+
+#First for the NHS variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 3] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+NHS_results <- lapply(1:length(df_mice$NHS), mice_procedure)
+
+#A couple of things to note about the code above. 
+#   First, 3 can also be set to "NHS" in the line that subsets df_mice1.
+#		Second, setting m to 200 and maxit to 20 previously crashed my computer. Thus, 100/15 is specified.
+
+
+```
+
+
+**Organize reults for NHS and compute mean and variance**
+```{r }
+
+NHS_results_df <- NHS_results[[1]][["imp"]][["NHS"]] %>%
+  slice(1:2) %>% 
+  rbind(NHS_results[[3]][["imp"]][["NHS"]]) %>%
+  slice(-3, -5) %>%
+  rbind(NHS_results[[4]][["imp"]][["NHS"]]) %>%
+  slice(-4, -6) %>%
+  rbind(NHS_results[[5]][["imp"]][["NHS"]]) %>%
+  slice(-5, -7) %>%
+  rbind(NHS_results[[6]][["imp"]][["NHS"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(NHS_results[[7]][["imp"]][["NHS"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(NHS_results[[8]][["imp"]][["NHS"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(NHS_results[[9]][["imp"]][["NHS"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(NHS_results[[10]][["imp"]][["NHS"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(NHS_results[[11]][["imp"]][["NHS"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(NHS_results[[12]][["imp"]][["NHS"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(NHS_results[[13]][["imp"]][["NHS"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(NHS_results[[14]][["imp"]][["NHS"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(NHS_results[[15]][["imp"]][["NHS"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(NHS_results[[16]][["imp"]][["NHS"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(NHS_results[[17]][["imp"]][["NHS"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(NHS_results[[18]][["imp"]][["NHS"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(NHS_results[[19]][["imp"]][["NHS"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(NHS_results[[20]][["imp"]][["NHS"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(NHS_results[[21]][["imp"]][["NHS"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(NHS_results[[22]][["imp"]][["NHS"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(NHS_results[[23]][["imp"]][["NHS"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(NHS_results[[24]][["imp"]][["NHS"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(NHS_results[[25]][["imp"]][["NHS"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(NHS_results[[26]][["imp"]][["NHS"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(NHS_results[[27]][["imp"]][["NHS"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(NHS_results[[28]][["imp"]][["NHS"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(NHS_results[[29]][["imp"]][["NHS"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(NHS_results[[30]][["imp"]][["NHS"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(NHS_results[[31]][["imp"]][["NHS"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(NHS_results[[32]][["imp"]][["NHS"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(NHS_results[[33]][["imp"]][["NHS"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(NHS_results[[34]][["imp"]][["NHS"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(NHS_results[[35]][["imp"]][["NHS"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(NHS_results[[36]][["imp"]][["NHS"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(NHS_results[[37]][["imp"]][["NHS"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(NHS_results[[38]][["imp"]][["NHS"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(NHS_results[[39]][["imp"]][["NHS"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(NHS_results[[40]][["imp"]][["NHS"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(NHS_results[[41]][["imp"]][["NHS"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(NHS_results[[42]][["imp"]][["NHS"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(NHS_results[[43]][["imp"]][["NHS"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(NHS_results[[45]][["imp"]][["NHS"]]) %>%
+  slice(-44) %>%
+  rbind(NHS_results[[46]][["imp"]][["NHS"]]) %>%
+  slice(-46, -47) %>%
+  rbind(NHS_results[[47]][["imp"]][["NHS"]]) %>%
+  slice(-47, -48) %>%
+  rbind(NHS_results[[48]][["imp"]][["NHS"]]) %>%
+  slice(-48, -49) %>%
+  rbind(NHS_results[[49]][["imp"]][["NHS"]]) %>%
+  slice(-49, -50) %>%
+  rbind(NHS_results[[50]][["imp"]][["NHS"]]) %>%
+  slice(-50, -51)
+
+NHS_results_df <- mutate(NHS_results_df, mean = rowMeans(NHS_results_df), 
+         se = rowSds(as.matrix(NHS_results_df))) 
+
+#Save results to computer a .csv
+write.csv(NHS_results_df, "[filepath]/NHS-MICE-Results.csv")
+
+```
+
+**HS**
+```{r, message=FALSE, warning=FALSE}
+
+#Now for the HS variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 4] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+HS_results <- lapply(1:length(df_mice$HS), mice_procedure)
+
+```
+
+
+**Organize results for HS and compute mean and variance**
+```{r }
+
+HS_results_df <- HS_results[[1]][["imp"]][["HS"]] %>%
+  slice(1:2) %>% 
+  rbind(HS_results[[3]][["imp"]][["HS"]]) %>%
+  slice(-3, -5) %>%
+  rbind(HS_results[[4]][["imp"]][["HS"]]) %>%
+  slice(-4, -6) %>%
+  rbind(HS_results[[5]][["imp"]][["HS"]]) %>%
+  slice(-5, -7) %>%
+  rbind(HS_results[[6]][["imp"]][["HS"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(HS_results[[7]][["imp"]][["HS"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(HS_results[[8]][["imp"]][["HS"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(HS_results[[9]][["imp"]][["HS"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(HS_results[[10]][["imp"]][["HS"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(HS_results[[11]][["imp"]][["HS"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(HS_results[[12]][["imp"]][["HS"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(HS_results[[13]][["imp"]][["HS"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(HS_results[[14]][["imp"]][["HS"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(HS_results[[15]][["imp"]][["HS"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(HS_results[[16]][["imp"]][["HS"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(HS_results[[17]][["imp"]][["HS"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(HS_results[[18]][["imp"]][["HS"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(HS_results[[19]][["imp"]][["HS"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(HS_results[[20]][["imp"]][["HS"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(HS_results[[21]][["imp"]][["HS"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(HS_results[[22]][["imp"]][["HS"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(HS_results[[23]][["imp"]][["HS"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(HS_results[[24]][["imp"]][["HS"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(HS_results[[25]][["imp"]][["HS"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(HS_results[[26]][["imp"]][["HS"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(HS_results[[27]][["imp"]][["HS"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(HS_results[[28]][["imp"]][["HS"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(HS_results[[29]][["imp"]][["HS"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(HS_results[[30]][["imp"]][["HS"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(HS_results[[31]][["imp"]][["HS"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(HS_results[[32]][["imp"]][["HS"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(HS_results[[33]][["imp"]][["HS"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(HS_results[[34]][["imp"]][["HS"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(HS_results[[35]][["imp"]][["HS"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(HS_results[[36]][["imp"]][["HS"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(HS_results[[37]][["imp"]][["HS"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(HS_results[[38]][["imp"]][["HS"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(HS_results[[39]][["imp"]][["HS"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(HS_results[[40]][["imp"]][["HS"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(HS_results[[41]][["imp"]][["HS"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(HS_results[[42]][["imp"]][["HS"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(HS_results[[43]][["imp"]][["HS"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(HS_results[[45]][["imp"]][["HS"]]) %>%
+  slice(-44) %>%
+  rbind(HS_results[[46]][["imp"]][["HS"]]) %>%
+  slice(-46, -47) %>%
+  rbind(HS_results[[47]][["imp"]][["HS"]]) %>%
+  slice(-47, -48) %>%
+  rbind(HS_results[[48]][["imp"]][["HS"]]) %>%
+  slice(-48, -49) %>%
+  rbind(HS_results[[49]][["imp"]][["HS"]]) %>%
+  slice(-49, -50) %>%
+  rbind(HS_results[[50]][["imp"]][["HS"]]) %>%
+  slice(-50, -51)
+
+  HS_results_df <- mutate(HS_results_df, mean = rowMeans(HS_results_df), 
+         se = rowSds(as.matrix(HS_results_df)))
+
+#Save results to computer a .csv
+write.csv(HS_results_df, "[filepath]/HS-MICE-Results.csv")
+  
+```
+
+**SBA**
+```{r, message=FALSE, warning=FALSE}
+
+#Now for the SBA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 5] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+SBA_results <- lapply(1:length(df_mice$SBA), mice_procedure)
+
+```
+
+**Organize results for SBA and compute mean and variance**
+```{r}
+
+SBA_results_df <- SBA_results[[1]][["imp"]][["SBA"]] %>%
+  slice(1:2) %>% 
+  rbind(SBA_results[[3]][["imp"]][["SBA"]]) %>%
+  slice(-3, -5) %>%
+  rbind(SBA_results[[4]][["imp"]][["SBA"]]) %>%
+  slice(-4, -6) %>%
+  rbind(SBA_results[[5]][["imp"]][["SBA"]]) %>%
+  slice(-5, -7) %>%
+  rbind(SBA_results[[6]][["imp"]][["SBA"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(SBA_results[[7]][["imp"]][["SBA"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(SBA_results[[8]][["imp"]][["SBA"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(SBA_results[[9]][["imp"]][["SBA"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(SBA_results[[10]][["imp"]][["SBA"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(SBA_results[[11]][["imp"]][["SBA"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(SBA_results[[12]][["imp"]][["SBA"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(SBA_results[[13]][["imp"]][["SBA"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(SBA_results[[14]][["imp"]][["SBA"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(SBA_results[[15]][["imp"]][["SBA"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(SBA_results[[16]][["imp"]][["SBA"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(SBA_results[[17]][["imp"]][["SBA"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(SBA_results[[18]][["imp"]][["SBA"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(SBA_results[[19]][["imp"]][["SBA"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(SBA_results[[20]][["imp"]][["SBA"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(SBA_results[[21]][["imp"]][["SBA"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(SBA_results[[22]][["imp"]][["SBA"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(SBA_results[[23]][["imp"]][["SBA"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(SBA_results[[24]][["imp"]][["SBA"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(SBA_results[[25]][["imp"]][["SBA"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(SBA_results[[26]][["imp"]][["SBA"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(SBA_results[[27]][["imp"]][["SBA"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(SBA_results[[28]][["imp"]][["SBA"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(SBA_results[[29]][["imp"]][["SBA"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(SBA_results[[30]][["imp"]][["SBA"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(SBA_results[[31]][["imp"]][["SBA"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(SBA_results[[32]][["imp"]][["SBA"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(SBA_results[[33]][["imp"]][["SBA"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(SBA_results[[34]][["imp"]][["SBA"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(SBA_results[[35]][["imp"]][["SBA"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(SBA_results[[36]][["imp"]][["SBA"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(SBA_results[[37]][["imp"]][["SBA"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(SBA_results[[38]][["imp"]][["SBA"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(SBA_results[[39]][["imp"]][["SBA"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(SBA_results[[40]][["imp"]][["SBA"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(SBA_results[[41]][["imp"]][["SBA"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(SBA_results[[42]][["imp"]][["SBA"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(SBA_results[[43]][["imp"]][["SBA"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(SBA_results[[45]][["imp"]][["SBA"]]) %>%
+  slice(-44) %>%
+  rbind(SBA_results[[46]][["imp"]][["SBA"]]) %>%
+  slice(-46, -47) %>%
+  rbind(SBA_results[[47]][["imp"]][["SBA"]]) %>%
+  slice(-47, -48) %>%
+  rbind(SBA_results[[48]][["imp"]][["SBA"]]) %>%
+  slice(-48, -49) %>%
+  rbind(SBA_results[[49]][["imp"]][["SBA"]]) %>%
+  slice(-49, -50) %>%
+  rbind(SBA_results[[50]][["imp"]][["SBA"]]) %>%
+  slice(-50, -51)
+
+SBA_results_df <- mutate(SBA_results_df, mean = rowMeans(SBA_results_df), 
+         se = rowSds(as.matrix(SBA_results_df)))
+
+#Save results to computer a .csv
+write.csv(SBA_results_df, "[filepath]/SBA-MICE-Results.csv")
+
+```
+
+**BA**
+```{r, message=FALSE, warning=FALSE}
+
+#Now for the BA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 6] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+BA_results <- lapply(1:length(df_mice$BA), mice_procedure)
+
+```
+
+**Organize results for BA and compute mean and variance**
+```{r}
+
+BA_results_df <- BA_results[[1]][["imp"]][["BA"]] %>%
+  slice(1:2) %>% 
+  rbind(BA_results[[3]][["imp"]][["BA"]]) %>%
+  slice(-3, -5) %>%
+  rbind(BA_results[[4]][["imp"]][["BA"]]) %>%
+  slice(-4, -6) %>%
+  rbind(BA_results[[5]][["imp"]][["BA"]]) %>%
+  slice(-5, -7) %>%
+  rbind(BA_results[[6]][["imp"]][["BA"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(BA_results[[7]][["imp"]][["BA"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(BA_results[[8]][["imp"]][["BA"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(BA_results[[9]][["imp"]][["BA"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(BA_results[[10]][["imp"]][["BA"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(BA_results[[11]][["imp"]][["BA"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(BA_results[[12]][["imp"]][["BA"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(BA_results[[13]][["imp"]][["BA"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(BA_results[[14]][["imp"]][["BA"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(BA_results[[15]][["imp"]][["BA"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(BA_results[[16]][["imp"]][["BA"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(BA_results[[17]][["imp"]][["BA"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(BA_results[[18]][["imp"]][["BA"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(BA_results[[19]][["imp"]][["BA"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(BA_results[[20]][["imp"]][["BA"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(BA_results[[21]][["imp"]][["BA"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(BA_results[[22]][["imp"]][["BA"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(BA_results[[23]][["imp"]][["BA"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(BA_results[[24]][["imp"]][["BA"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(BA_results[[25]][["imp"]][["BA"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(BA_results[[26]][["imp"]][["BA"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(BA_results[[27]][["imp"]][["BA"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(BA_results[[28]][["imp"]][["BA"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(BA_results[[29]][["imp"]][["BA"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(BA_results[[30]][["imp"]][["BA"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(BA_results[[31]][["imp"]][["BA"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(BA_results[[32]][["imp"]][["BA"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(BA_results[[33]][["imp"]][["BA"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(BA_results[[34]][["imp"]][["BA"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(BA_results[[35]][["imp"]][["BA"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(BA_results[[36]][["imp"]][["BA"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(BA_results[[37]][["imp"]][["BA"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(BA_results[[38]][["imp"]][["BA"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(BA_results[[39]][["imp"]][["BA"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(BA_results[[40]][["imp"]][["BA"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(BA_results[[41]][["imp"]][["BA"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(BA_results[[42]][["imp"]][["BA"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(BA_results[[43]][["imp"]][["BA"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(BA_results[[45]][["imp"]][["BA"]]) %>%
+  slice(-44) %>%
+  rbind(BA_results[[46]][["imp"]][["BA"]]) %>%
+  slice(-46, -47) %>%
+  rbind(BA_results[[47]][["imp"]][["BA"]]) %>%
+  slice(-47, -48) %>%
+  rbind(BA_results[[48]][["imp"]][["BA"]]) %>%
+  slice(-48, -49) %>%
+  rbind(BA_results[[49]][["imp"]][["BA"]]) %>%
+  slice(-49, -50) %>%
+  rbind(BA_results[[50]][["imp"]][["BA"]]) %>%
+  slice(-50, -51)
+
+BA_results_df <- mutate(BA_results_df, mean = rowMeans(BA_results_df), 
+         se = rowSds(as.matrix(BA_results_df)))
+
+#Save results to computer as a .csv
+write.csv(BA_results_df, "[filepath]/BA-MICE-Results.csv")
+
+```
+
+**B**
+```{r}
+
+#Now for the B variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 8] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+B_results <- lapply(1:length(df_mice$B), mice_procedure)
+
+```
+
+**Organize results for B and compute mean and variance**
+```{r}
+
+B_results_df <- B_results[[1]][["imp"]][["B"]] %>%
+  slice(1) %>% 
+  rbind(B_results[[2]][["imp"]][["B"]]) %>%
+  slice(1:2) %>%
+  rbind(B_results[[3]][["imp"]][["B"]]) %>%
+  slice(1:3) %>%
+  rbind(B_results[[4]][["imp"]][["B"]]) %>%
+  slice(1:4) %>%
+  rbind(B_results[[5]][["imp"]][["B"]]) %>% 
+  slice(1:5) %>%
+  rbind(B_results[[6]][["imp"]][["B"]]) %>% 
+  slice(1:6) %>%
+  rbind(B_results[[7]][["imp"]][["B"]]) %>% 
+  slice(1:7) %>%
+  rbind(B_results[[8]][["imp"]][["B"]]) %>% 
+  slice(1:8) %>%
+  rbind(B_results[[9]][["imp"]][["B"]]) %>% 
+  slice(1:9) %>%
+  rbind(B_results[[10]][["imp"]][["B"]]) %>% 
+  slice(1:10) %>%
+  rbind(B_results[[13]][["imp"]][["B"]]) %>% 
+  slice(1:13) %>%
+  rbind(B_results[[14]][["imp"]][["B"]]) %>% 
+  slice(1:13, 16) %>%
+  rbind(B_results[[15]][["imp"]][["B"]]) %>% 
+  slice(1:14, 17) %>%
+  rbind(B_results[[16]][["imp"]][["B"]]) %>% 
+  slice(1:15, 18) %>%
+  rbind(B_results[[17]][["imp"]][["B"]]) %>% 
+  slice(1:16, 19) %>%
+  rbind(B_results[[18]][["imp"]][["B"]]) %>% 
+  slice(1:17, 20) %>%
+  rbind(B_results[[20]][["imp"]][["B"]]) %>% 
+  slice(1:18, 20:21) %>%
+  rbind(B_results[[21]][["imp"]][["B"]]) %>% 
+  slice(1:20, 24) %>%
+  rbind(B_results[[22]][["imp"]][["B"]]) %>% 
+  slice(1:21, 25) %>%
+  rbind(B_results[[23]][["imp"]][["B"]]) %>% 
+  slice(1:22, 26) %>%
+  rbind(B_results[[24]][["imp"]][["B"]]) %>% 
+  slice(1:23, 27) %>%
+  rbind(B_results[[25]][["imp"]][["B"]]) %>% 
+  slice(1:24, 28) %>%
+  rbind(B_results[[27]][["imp"]][["B"]]) %>% 
+  slice(1:25, 29:30) %>%
+  rbind(B_results[[28]][["imp"]][["B"]]) %>% 
+  slice(1:27, 32) %>%
+  rbind(B_results[[30]][["imp"]][["B"]]) %>% 
+  slice(1:28, 33:34) %>%
+  rbind(B_results[[32]][["imp"]][["B"]]) %>% 
+  slice(1:30, 36:37) %>%
+  rbind(B_results[[33]][["imp"]][["B"]]) %>% 
+  slice(1:32, 39) %>%
+  rbind(B_results[[34]][["imp"]][["B"]]) %>% 
+  slice(1:33, 40) %>%
+  rbind(B_results[[35]][["imp"]][["B"]]) %>% 
+  slice(1:34, 41) %>%
+  rbind(B_results[[36]][["imp"]][["B"]]) %>% 
+  slice(1:35, 42) %>%
+  rbind(B_results[[38]][["imp"]][["B"]]) %>% 
+  slice(1:36, 43:44) %>%
+  rbind(B_results[[39]][["imp"]][["B"]]) %>% 
+  slice(1:38, 46) %>%
+  rbind(B_results[[40]][["imp"]][["B"]]) %>% 
+  slice(1:39, 47) %>%
+  rbind(B_results[[42]][["imp"]][["B"]]) %>% 
+  slice(1:40, 48:49) %>%
+  rbind(B_results[[43]][["imp"]][["B"]]) %>% 
+  slice(1:42, 51) %>%
+  rbind(B_results[[46]][["imp"]][["B"]]) %>% 
+  slice(1:43, 52:54) %>%
+  rbind(B_results[[47]][["imp"]][["B"]]) %>% 
+  slice(1:46, 57) %>%
+  rbind(B_results[[48]][["imp"]][["B"]]) %>% 
+  slice(1:47, 58) %>%
+  rbind(B_results[[49]][["imp"]][["B"]]) %>% 
+  slice(1:48, 59:60) 
+
+B_results_df <- mutate(B_results_df, mean = rowMeans(B_results_df), 
+         se = rowSds(as.matrix(B_results_df)))
+
+#Save results to computer as a .csv
+write.csv(B_results_df, "[filepath]/B-MICE-Results.csv")
+
+```
+
+**H**
+```{r}
+
+#Now for the H variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 9] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+H_results <- lapply(1:length(df_mice$H), mice_procedure)
+
+```
+
+**Organize results for H and compute mean and variance**
+```{r}
+
+H_results_df <- H_results[[1]][["imp"]][["H"]] %>%
+  slice(1) %>% 
+  rbind(H_results[[2]][["imp"]][["H"]]) %>%
+  slice(1:2) %>%
+  rbind(H_results[[3]][["imp"]][["H"]]) %>%
+  slice(1:3) %>%
+  rbind(H_results[[4]][["imp"]][["H"]]) %>%
+  slice(1:4) %>%
+  rbind(H_results[[5]][["imp"]][["H"]]) %>% 
+  slice(1:5) %>%
+  rbind(H_results[[6]][["imp"]][["H"]]) %>% 
+  slice(1:6) %>%
+  rbind(H_results[[7]][["imp"]][["H"]]) %>% 
+  slice(1:7) %>%
+  rbind(H_results[[8]][["imp"]][["H"]]) %>% 
+  slice(1:8) %>%
+  rbind(H_results[[9]][["imp"]][["H"]]) %>% 
+  slice(1:9) %>%
+  rbind(H_results[[10]][["imp"]][["H"]]) %>% 
+  slice(1:10) %>%
+  rbind(H_results[[11]][["imp"]][["H"]]) %>% 
+  slice(1:11) %>%
+  rbind(H_results[[12]][["imp"]][["H"]]) %>% 
+  slice(1:12) %>%
+  rbind(H_results[[13]][["imp"]][["H"]]) %>% 
+  slice(1:13) %>%
+  rbind(H_results[[14]][["imp"]][["H"]]) %>% 
+  slice(1:14) %>%
+  rbind(H_results[[15]][["imp"]][["H"]]) %>% 
+  slice(1:15) %>%
+  rbind(H_results[[16]][["imp"]][["H"]]) %>% 
+  slice(1:16) %>%
+  rbind(H_results[[17]][["imp"]][["H"]]) %>% 
+  slice(1:17) %>%
+  rbind(H_results[[18]][["imp"]][["H"]]) %>% 
+  slice(1:18) %>%
+  rbind(H_results[[20]][["imp"]][["H"]]) %>% 
+  slice(1:20) %>%
+  rbind(H_results[[21]][["imp"]][["H"]]) %>% 
+  slice(1:20, 22) %>%
+  rbind(H_results[[22]][["imp"]][["H"]]) %>% 
+  slice(1:21, 23) %>%
+  rbind(H_results[[23]][["imp"]][["H"]]) %>% 
+  slice(1:22, 24) %>%
+  rbind(H_results[[24]][["imp"]][["H"]]) %>% 
+  slice(1:23, 25) %>%
+  rbind(H_results[[25]][["imp"]][["H"]]) %>% 
+  slice(1:24, 26) %>%
+  rbind(H_results[[26]][["imp"]][["H"]]) %>% 
+  slice(1:25, 27) %>%
+  rbind(H_results[[27]][["imp"]][["H"]]) %>% 
+  slice(1:26, 28) %>%
+  rbind(H_results[[28]][["imp"]][["H"]]) %>% 
+  slice(1:27, 29) %>%
+  rbind(H_results[[29]][["imp"]][["H"]]) %>% 
+  slice(1:28, 30) %>%
+  rbind(H_results[[30]][["imp"]][["H"]]) %>% 
+  slice(1:29, 31) %>%
+  rbind(H_results[[31]][["imp"]][["H"]]) %>% 
+  slice(1:30, 32) %>%
+  rbind(H_results[[32]][["imp"]][["H"]]) %>% 
+  slice(1:31, 33) %>%
+  rbind(H_results[[33]][["imp"]][["H"]]) %>% 
+  slice(1:32, 34) %>%
+  rbind(H_results[[34]][["imp"]][["H"]]) %>% 
+  slice(1:33, 35) %>%
+  rbind(H_results[[35]][["imp"]][["H"]]) %>% 
+  slice(1:34, 36) %>%
+  rbind(H_results[[36]][["imp"]][["H"]]) %>% 
+  slice(1:35, 37) %>%
+  rbind(H_results[[37]][["imp"]][["H"]]) %>% 
+  slice(1:36, 38) %>%
+  rbind(H_results[[38]][["imp"]][["H"]]) %>% 
+  slice(1:37, 39) %>%
+  rbind(H_results[[39]][["imp"]][["H"]]) %>% 
+  slice(1:38, 40) %>%
+  rbind(H_results[[40]][["imp"]][["H"]]) %>% 
+  slice(1:39, 41) %>%
+  rbind(H_results[[41]][["imp"]][["H"]]) %>% 
+  slice(1:40, 42) %>%
+  rbind(H_results[[42]][["imp"]][["H"]]) %>% 
+  slice(1:41, 43) %>%
+  rbind(H_results[[43]][["imp"]][["H"]]) %>% 
+  slice(1:42, 44) %>%
+  rbind(H_results[[44]][["imp"]][["H"]]) %>% 
+  slice(1:43, 45) %>% 
+  rbind(H_results[[46]][["imp"]][["H"]]) %>% 
+  slice(1:44, 46:47) %>% 
+  rbind(H_results[[47]][["imp"]][["H"]]) %>% 
+  slice(1:46, 49) %>% 
+  rbind(H_results[[49]][["imp"]][["H"]]) %>% 
+  slice(1:47, 50:51) %>% 
+  rbind(H_results[[50]][["imp"]][["H"]]) %>% 
+  slice(1:49, 53)
+
+H_results_df <- mutate(H_results_df, mean = rowMeans(H_results_df), 
+         se = rowSds(as.matrix(H_results_df)))
+
+#Save results to computer as a .csv
+write.csv(H_results_df, "[filepath]/H-MICE-Results.csv")
+
+```
+
+**API**
+```{r}
+
+#Now for the API variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 10] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+API_results <- lapply(1:length(df_mice$API), mice_procedure)
+
+```
+
+**Organize results for API and compute mean and variance**
+```{r}
+
+API_results_df <- API_results[[2]][["imp"]][["API"]] %>%
+  slice(1:2) %>% 
+  rbind(API_results[[3]][["imp"]][["API"]]) %>%
+  slice(1:2, 4) %>% 
+  rbind(API_results[[5]][["imp"]][["API"]]) %>%
+  slice(1:3, 5:6) %>% 
+  rbind(API_results[[6]][["imp"]][["API"]]) %>%
+  slice(1:5, 8) %>%
+  rbind(API_results[[7]][["imp"]][["API"]]) %>%
+  slice(1:6, 9) %>%
+  rbind(API_results[[8]][["imp"]][["API"]]) %>%
+  slice(1:7, 10) %>%
+  rbind(API_results[[9]][["imp"]][["API"]]) %>%
+  slice(1:8, 11) %>%
+  rbind(API_results[[10]][["imp"]][["API"]]) %>%
+  slice(1:9, 12) %>%
+  rbind(API_results[[11]][["imp"]][["API"]]) %>%
+  slice(1:10, 13) %>%
+  rbind(API_results[[13]][["imp"]][["API"]]) %>%
+  slice(1:11, 14:15) %>%
+  rbind(API_results[[15]][["imp"]][["API"]]) %>%
+  slice(1:13, 17:18) %>%
+  rbind(API_results[[16]][["imp"]][["API"]]) %>%
+  slice(1:15, 20) %>%
+  rbind(API_results[[17]][["imp"]][["API"]]) %>%
+  slice(1:16, 21) %>%
+  rbind(API_results[[20]][["imp"]][["API"]]) %>%
+  slice(1:17, 22:24) %>%
+  rbind(API_results[[21]][["imp"]][["API"]]) %>%
+  slice(1:20, 27) %>%
+  rbind(API_results[[22]][["imp"]][["API"]]) %>%
+  slice(1:21, 28) %>%
+  rbind(API_results[[23]][["imp"]][["API"]]) %>%
+  slice(1:22, 29) %>%
+  rbind(API_results[[28]][["imp"]][["API"]]) %>%
+  slice(1:23, 30:34) %>%
+  rbind(API_results[[29]][["imp"]][["API"]]) %>%
+  slice(1:28, 39) %>%
+  rbind(API_results[[30]][["imp"]][["API"]]) %>%
+  slice(1:29, 40) %>%
+  rbind(API_results[[32]][["imp"]][["API"]]) %>%
+  slice(1:30, 41:42) %>%
+  rbind(API_results[[33]][["imp"]][["API"]]) %>%
+  slice(1:32, 44) %>%
+  rbind(API_results[[35]][["imp"]][["API"]]) %>%
+  slice(1:33, 45:46) %>%
+  rbind(API_results[[37]][["imp"]][["API"]]) %>%
+  slice(1:35, 48:49) %>%
+  rbind(API_results[[38]][["imp"]][["API"]]) %>%
+  slice(1:37, 51) %>%
+  rbind(API_results[[39]][["imp"]][["API"]]) %>%
+  slice(1:38, 52) %>%
+  rbind(API_results[[43]][["imp"]][["API"]]) %>%
+  slice(1:39, 53:56) %>%
+  rbind(API_results[[46]][["imp"]][["API"]]) %>%
+  slice(1:43, 60:62) %>%
+  rbind(API_results[[47]][["imp"]][["API"]]) %>%
+  slice(1:46, 65) %>%
+  rbind(API_results[[49]][["imp"]][["API"]]) %>%
+  slice(1:47, 66:68)
+
+API_results_df <- mutate(API_results_df, mean = rowMeans(API_results_df), 
+         se = rowSds(as.matrix(API_results_df)))
+
+#Save results to computer as a .csv
+write.csv(API_results_df, "[filepath]/API-MICE-Results.csv")
+
+```
+
+**AINA**
+```{r}
+
+#Now for the AINA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 11] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+AINA_results <- lapply(1:length(df_mice$AINA), mice_procedure)
+
+```
+
+**Organize results for API and compute mean and variance**
+```{r}
+
+AINA_results_df <- AINA_results[[2]][["imp"]][["AINA"]] %>%
+  slice(1:2) %>% 
+  rbind(AINA_results[[3]][["imp"]][["AINA"]]) %>%
+  slice(1:2, 4) %>% 
+  rbind(AINA_results[[23]][["imp"]][["AINA"]]) %>%
+  slice(1:3, 5:24) %>% 
+  rbind(AINA_results[[26]][["imp"]][["AINA"]]) %>%
+  slice(1:23, 44:46) %>% 
+  rbind(AINA_results[[31]][["imp"]][["AINA"]]) %>%
+  slice(1:26, 49:53) %>% 
+  rbind(AINA_results[[33]][["imp"]][["AINA"]]) %>%
+  slice(1:31, 58:59) %>% 
+  rbind(AINA_results[[34]][["imp"]][["AINA"]])  %>%
+  slice(1:33, 61) %>% 
+  rbind(AINA_results[[36]][["imp"]][["AINA"]]) %>%
+  slice(1:34, 62:63) %>% 
+  rbind(AINA_results[[41]][["imp"]][["AINA"]]) %>%
+  slice(1:36, 65:69) %>% 
+  rbind(AINA_results[[44]][["imp"]][["AINA"]]) %>%
+  slice(1:41, 74:76) %>% 
+  rbind(AINA_results[[47]][["imp"]][["AINA"]]) %>%
+  slice(1:44, 79:81) %>% 
+  rbind(AINA_results[[49]][["imp"]][["AINA"]]) %>%
+  slice(1:47, 84:85) %>% 
+  rbind(AINA_results[[50]][["imp"]][["AINA"]]) %>%
+  slice(1:49, 87)
+        
+AINA_results_df <- mutate(AINA_results_df, mean = rowMeans(AINA_results_df), 
+         se = rowSds(as.matrix(AINA_results_df)))
+
+#Save results to computer as a .csv
+write.csv(AINA_results_df, "[filepath]/AINA-MICE-Results.csv")
+
+```
+
+**TP**
+```{r}
+
+#Now for the TP variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 12] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+TP_results <- lapply(1:length(df_mice$TP), mice_procedure)
+
+```
+
+**Organize results for TP and compute mean and variance**
+```{r}
+
+TP_results_df <- TP_results[[2]][["imp"]][["TP"]] %>% 
+  slice(1:2) %>% 
+  rbind(TP_results[[5]][["imp"]][["TP"]]) %>% 
+  slice(1:2, 4:6) %>% 
+  rbind(TP_results[[6]][["imp"]][["TP"]]) %>% 
+  slice(1:5, 9) %>% 
+  rbind(TP_results[[9]][["imp"]][["TP"]]) %>% 
+  slice(1:6, 10:12) %>% 
+  rbind(TP_results[[10]][["imp"]][["TP"]]) %>% 
+  slice(1:9, 15) %>% 
+  rbind(TP_results[[11]][["imp"]][["TP"]]) %>% 
+  slice(1:10, 16) %>% 
+  rbind(TP_results[[14]][["imp"]][["TP"]]) %>% 
+  slice(1:11, 17:19) %>% 
+  rbind(TP_results[[15]][["imp"]][["TP"]]) %>% 
+  slice(1:14, 22) %>% 
+  rbind(TP_results[[16]][["imp"]][["TP"]]) %>% 
+  slice(1:15, 23) %>%
+  rbind(TP_results[[17]][["imp"]][["TP"]]) %>% 
+  slice(1:16, 24) %>%
+  rbind(TP_results[[20]][["imp"]][["TP"]]) %>% 
+  slice(1:17, 25:27) %>% 
+  rbind(TP_results[[23]][["imp"]][["TP"]]) %>% 
+  slice(1:20, 30:32) %>% 
+  rbind(TP_results[[26]][["imp"]][["TP"]]) %>% 
+  slice(1:23, 35:37) %>% 
+  rbind(TP_results[[27]][["imp"]][["TP"]]) %>% 
+  slice(1:26, 40) %>% 
+  rbind(TP_results[[28]][["imp"]][["TP"]]) %>% 
+  slice(1:27, 41) %>% 
+  rbind(TP_results[[33]][["imp"]][["TP"]]) %>% 
+  slice(1:28, 42:46) %>% 
+  rbind(TP_results[[35]][["imp"]][["TP"]]) %>% 
+  slice(1:33, 51:52) %>% 
+  rbind(TP_results[[36]][["imp"]][["TP"]]) %>% 
+  slice(1:35, 54) %>% 
+  rbind(TP_results[[37]][["imp"]][["TP"]]) %>% 
+  slice(1:36, 55) %>% 
+  rbind(TP_results[[38]][["imp"]][["TP"]]) %>% 
+  slice(1:37, 56) %>% 
+  rbind(TP_results[[39]][["imp"]][["TP"]]) %>% 
+  slice(1:38, 57) %>% 
+  rbind(TP_results[[43]][["imp"]][["TP"]]) %>% 
+  slice(1:39, 58:61) %>% 
+  rbind(TP_results[[46]][["imp"]][["TP"]]) %>% 
+  slice(1:43, 65:67) %>% 
+  rbind(TP_results[[47]][["imp"]][["TP"]]) %>% 
+  slice(1:46, 70:73)
+  
+TP_results_df <- mutate(TP_results_df, mean = rowMeans(TP_results_df), 
+         se = rowSds(as.matrix(TP_results_df)))
+
+#Save results to computer as a .csv
+write.csv(TP_results_df, "[filepath]/TP-MICE-Results.csv")
+
+```
+
+**EL**
+```{r}
+
+#Now for the EL variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 13] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = "norm", pred = pred_matrix, seed = 2019)
+}
+EL_results <- lapply(1:length(df_mice$EL), mice_procedure)
+
+```
+
+
+**Organize results for EL and compute mean and variance**
+```{r}
+
+EL_results_df <- EL_results[[2]][["imp"]][["EL"]] %>% 
+  slice(1:2) %>% 
+  rbind(EL_results[[3]][["imp"]][["EL"]]) %>%
+  slice(1:2, 4) %>% 
+  rbind(EL_results[[4]][["imp"]][["EL"]]) %>%
+  slice(1:3, 5) %>% 
+  rbind(EL_results[[5]][["imp"]][["EL"]]) %>%
+  slice(1:4, 6) %>% 
+  rbind(EL_results[[6]][["imp"]][["EL"]]) %>%
+  slice(1:5, 7) %>% 
+  rbind(EL_results[[7]][["imp"]][["EL"]]) %>% 
+  slice(1:6, 8) %>% 
+  rbind(EL_results[[9]][["imp"]][["EL"]]) %>% 
+  slice(1:7, 9:10) %>% 
+  rbind(EL_results[[10]][["imp"]][["EL"]]) %>% 
+  slice(1:9, 12) %>% 
+  rbind(EL_results[[11]][["imp"]][["EL"]]) %>% 
+  slice(1:10, 13) %>% 
+  rbind(EL_results[[13]][["imp"]][["EL"]]) %>% 
+  slice(1:11, 14:15) %>% 
+  rbind(EL_results[[14]][["imp"]][["EL"]]) %>% 
+  slice(1:13, 17) %>% 
+  rbind(EL_results[[15]][["imp"]][["EL"]]) %>% 
+  slice(1:14, 18) %>% 
+  rbind(EL_results[[16]][["imp"]][["EL"]]) %>% 
+  slice(1:15, 19) %>% 
+  rbind(EL_results[[20]][["imp"]][["EL"]]) %>% 
+  slice(1:16, 20:23) %>% 
+  rbind(EL_results[[21]][["imp"]][["EL"]]) %>% 
+  slice(1:20, 27) %>% 
+  rbind(EL_results[[22]][["imp"]][["EL"]]) %>% 
+  slice(1:21, 28) %>% 
+  rbind(EL_results[[23]][["imp"]][["EL"]]) %>% 
+  slice(1:22, 29) %>% 
+  rbind(EL_results[[28]][["imp"]][["EL"]]) %>% 
+  slice(1:23, 30:34) %>% 
+  rbind(EL_results[[31]][["imp"]][["EL"]]) %>% 
+  slice(1:28, 39:41) %>% 
+  rbind(EL_results[[32]][["imp"]][["EL"]]) %>% 
+  slice(1:31, 44) %>% 
+  rbind(EL_results[[33]][["imp"]][["EL"]]) %>% 
+  slice(1:32, 45) %>% 
+  rbind(EL_results[[35]][["imp"]][["EL"]]) %>% 
+  slice(1:33, 46:47) %>% 
+  rbind(EL_results[[36]][["imp"]][["EL"]]) %>% 
+  slice(1:35, 49) %>% 
+  rbind(EL_results[[38]][["imp"]][["EL"]]) %>% 
+  slice(1:36, 50:51) %>% 
+  rbind(EL_results[[39]][["imp"]][["EL"]]) %>% 
+  slice(1:38, 53) %>% 
+  rbind(EL_results[[40]][["imp"]][["EL"]]) %>% 
+  slice(1:39, 54) %>% 
+  rbind(EL_results[[43]][["imp"]][["EL"]]) %>% 
+  slice(1:40, 55:57) %>% 
+  rbind(EL_results[[44]][["imp"]][["EL"]]) %>% 
+  slice(1:43, 60) %>% 
+  rbind(EL_results[[46]][["imp"]][["EL"]]) %>% 
+  slice(1:44, 61:62) %>% 
+  rbind(EL_results[[47]][["imp"]][["EL"]]) %>% 
+  slice(1:46, 64) %>% 
+  rbind(EL_results[[49]][["imp"]][["EL"]]) %>% 
+  slice(1:47, 65:67)
+  
+  
+EL_results_df <- mutate(EL_results_df, mean = rowMeans(EL_results_df), 
+         se = rowSds(as.matrix(EL_results_df)))
+
+#Save results to computer as a .csv
+write.csv(EL_results_df, "[filepath]/EL-MICE-Results.csv")
+
+```
+
+### Free up memory
+
+Clear objects from environment to preserve memory 
+```{r warning=FALSE, message=FALSE}
+rm(list = ls())
+```
+
+### Import results from MICE procedure
+```{r warning=FALSE, message=FALSE}
+
+NHS_results_df <- read_csv("[filepath]/NHS-MICE-Results.csv")
+HS_results_df <- read_csv("[filepath]/HS-MICE-Results.csv")
+SBA_results_df <- read_csv("[filepath]/SBA-MICE-Results.csv")
+BA_results_df <- read_csv("[filepath]/BA-MICE-Results.csv")
+B_results_df <- read_csv("[filepath]/B-MICE-Results.csv")
+H_results_df <- read_csv("[filepath]/H-MICE-Results.csv")
+API_results_df <- read_csv("[filepath]/API-MICE-Results.csv")
+AINA_results_df <- read_csv("[filepath]/AINA-MICE-Results.csv")
+TP_results_df <- read_csv("[filepath]/TP-MICE-Results.csv")
+EL_results_df <- read_csv("[filepath]/EL-MICE-Results.csv")
+
+```
+
+### Wrangle all predicted values
+
+
+*Save state abbreviations to an object called "State".*
+```{r, warning=FALSE, message=FALSE}
+
+State <- read_csv("[filepath]/Subgroups of Interest/2+.csv")
+
+State <- State[,1]
+
+```
+
+*Column bind "State" to each of the subgroup results data frames*
+
+```{r, warning=FALSE, message=FALSE}
+
+NHS_results_df <- cbind(State, NHS_results_df)
+HS_results_df <- cbind(State, HS_results_df)
+SBA_results_df <- cbind(State, SBA_results_df)
+BA_results_df <- cbind(State, BA_results_df)
+B_results_df <- cbind(State, B_results_df)
+H_results_df <- cbind(State, H_results_df)
+API_results_df <- cbind(State, API_results_df)
+AINA_results_df <- cbind(State, AINA_results_df)
+TP_results_df <- cbind(State, TP_results_df)
+EL_results_df <- cbind(State, EL_results_df)
+
+```
+
+Keep only State, mean and se variables
+
+```{r, warning=FALSE, message=FALSE}
+
+NHS_results_df <- NHS_results_df %>%
+  select("State", "mean", "se")
+HS_results_df <- HS_results_df %>%
+  select("State", "mean", "se")
+SBA_results_df <- SBA_results_df %>%
+  select("State", "mean", "se")
+BA_results_df <- BA_results_df %>%
+  select("State", "mean", "se")
+B_results_df <- B_results_df %>%
+  select("State", "mean", "se")
+H_results_df <- H_results_df %>%
+  select("State", "mean", "se")
+API_results_df <- API_results_df %>%
+  select("State", "mean", "se")
+AINA_results_df <- AINA_results_df %>%
+  select("State", "mean", "se")
+TP_results_df <- TP_results_df %>%
+  select("State", "mean", "se")
+EL_results_df <- EL_results_df %>%
+  select("State", "mean", "se")
+
+
+```
+
+Keep only target values
+
+```{r, warning=FALSE, message=FALSE}
+#NHS
+NHS_results_df[2,2:3] <- NA
+NHS_results_df[44,2:3] <- NA
+
+#HS
+HS_results_df[2,2:3] <- NA
+HS_results_df[44,2:3] <- NA
+
+#SBA
+SBA_results_df[2,2:3] <- NA
+SBA_results_df[44,2:3] <- NA
+
+#BA
+BA_results_df[2,2:3] <- NA
+BA_results_df[44,2:3] <- NA
+
+#B
+B_results_df[11:12,2:3] <- NA
+B_results_df[19,2:3] <- NA
+B_results_df[26,2:3] <- NA
+B_results_df[29,2:3] <- NA
+B_results_df[31,2:3] <- NA
+B_results_df[37,2:3] <- NA
+B_results_df[41,2:3] <- NA
+B_results_df[44:45,2:3] <- NA
+B_results_df[50,2:3] <- NA
+
+#H
+H_results_df[19,2:3] <- NA
+H_results_df[45,2:3] <- NA
+H_results_df[48,2:3] <- NA
+
+#API
+API_results_df[1,2:3] <- NA
+API_results_df[4,2:3] <- NA
+API_results_df[12,2:3] <- NA
+API_results_df[14,2:3] <- NA
+API_results_df[18:19,2:3] <- NA
+API_results_df[24:27,2:3] <- NA
+API_results_df[31,2:3] <- NA
+API_results_df[34,2:3] <- NA
+API_results_df[36,2:3] <- NA
+API_results_df[40:42,2:3] <- NA
+API_results_df[44:45,2:3] <- NA
+API_results_df[48,2:3] <- NA
+API_results_df[50,2:3] <- NA
+
+#AINA
+AINA_results_df[1,2:3] <- NA
+AINA_results_df[4:22,2:3] <- NA
+AINA_results_df[24:25,2:3] <- NA
+AINA_results_df[27:30,2:3] <- NA
+AINA_results_df[32,2:3] <- NA
+AINA_results_df[35,2:3] <- NA
+AINA_results_df[37:40,2:3] <- NA
+AINA_results_df[42:43,2:3] <- NA
+AINA_results_df[45:46,2:3] <- NA
+AINA_results_df[48,2:3] <- NA
+
+#TP
+TP_results_df[1,2:3] <- NA
+TP_results_df[3:4,2:3] <- NA
+TP_results_df[7:8,2:3] <- NA
+TP_results_df[12:13,2:3] <- NA
+TP_results_df[18:19,2:3] <- NA
+TP_results_df[21:22,2:3] <- NA
+TP_results_df[24:25,2:3] <- NA
+TP_results_df[29:32,2:3] <- NA
+TP_results_df[34,2:3] <- NA
+TP_results_df[40:42,2:3] <- NA
+TP_results_df[44:45,2:3] <- NA
+TP_results_df[48:50,2:3] <- NA
+
+#EL
+EL_results_df[1,2:3] <- NA
+EL_results_df[8,2:3] <- NA
+EL_results_df[12,2:3] <- NA
+EL_results_df[17:19,2:3] <- NA
+EL_results_df[24:27,2:3] <- NA
+EL_results_df[29:30,2:3] <- NA
+EL_results_df[34,2:3] <- NA
+EL_results_df[37,2:3] <- NA
+EL_results_df[41:42,2:3] <- NA
+EL_results_df[45,2:3] <- NA
+EL_results_df[48,2:3] <- NA
+EL_results_df[50,2:3] <- NA
+
+
+
+
+```
+
+**SPOT CHECKED?**
+
+YES
+
+### Check plausibility of MICE-based estimates of mean subgroup achievement
+
+**NHS**
+```{r warning=FALSE, message=FALSE}
+
+ NHS_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 277.58, color="red") + 
+  geom_hline(yintercept = 251.62, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+All of the predicted values are in bound. Though one (AL) is very close to falling under the lower bound. 
+
+**HS**
+```{r warning=FALSE, message=FALSE}
+
+ HS_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 282.8088, color="red") + 
+  geom_hline(yintercept = 253.2988, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+All of the predicted values are in bound.
+
+**SBA**
+```{r warning=FALSE, message=FALSE}
+
+SBA_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 294.2487, color="red") + 
+  geom_hline(yintercept = 272.0388, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+Two predicted values are out of bounds-- AL was lower and MA was higher. **This variable (subgroup of interest) will need to be imputed with PMM.**
+
+**BA**
+```{r warning=FALSE, message=FALSE}
+
+BA_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 309.5, color="red") + 
+  geom_hline(yintercept = 276.1, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+Two predicted values are out of bounds-- AL was lower and MA was higher (again). **This variable (subgroup of interest) will need to be imputed with PMM.**
+
+**B**
+```{r warning=FALSE, message=FALSE}
+
+B_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 273.9625, color="red") + 
+  geom_hline(yintercept = 245.0225, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+All of the predicted values are in bound.
+
+**H**
+```{r warning=FALSE, message=FALSE}
+
+H_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 256.9075, color="red") + 
+  geom_hline(yintercept = 282.4075, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+All predicted values for this subgroup are in bound.
+
+**API**
+```{r warning=FALSE, message=FALSE}
+
+API_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 334.6888, color="red") + 
+  geom_hline(yintercept = 276.1587, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+All predicted values for this subgroup are in bound.
+
+**AINA**
+```{r warning=FALSE, message=FALSE}
+
+AINA_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 266.865, color="red") + 
+  geom_hline(yintercept = 251.305, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+Two predicted values are out of bounds-- AZ was lower and MN was higher. **This variable (subgroup of interest) will need to be imputed with PMM.**
+
+**2+**
+```{r warning=FALSE, message=FALSE}
+
+TP_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 296.5063, color="red") + 
+  geom_hline(yintercept = 266.9763, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+All predicted values for this subgroup are in bound.
+
+**EL**
+```{r warning=FALSE, message=FALSE}
+
+EL_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 275.975, color="red") + 
+  geom_hline(yintercept = 216.415, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+All predicted values for this subgroup are in bound.
+
+**Summary:**
+
+Three subgroups of interest (incomplete variables) need to be imputed with PMM-- SBA, BA and AINA.
+
+### Re-execute MICE procedure for SBA, BA and AINA
+
+**First, define the method by which each missing variable willS be imputed**
+
+In the previous set of imputations, "norm" was used for all of the incomplete variables and only needed to be specified once.
+```{r warning=FALSE, message=FALSE}
+
+methods_string <- c("", "", 'norm', 'norm', 'pmm', 'pmm', "", 'norm', 'norm', 'norm', 'pmm', 'norm', 'norm', "", "", "", "", "")
+
+```
+
+
+**SBA (PMM)**
+```{r, message=FALSE, warning=FALSE}
+
+#Now for the SBA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 5] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = methods_string, pred = pred_matrix, seed = 2019)
+}
+SBA_results <- lapply(1:length(df_mice$SBA), mice_procedure)
+
+```
+
+**Organize results for SBA and compute mean and variance**
+```{r}
+
+SBA_results_df <- SBA_results[[1]][["imp"]][["SBA"]] %>%
+  slice(1:2) %>% 
+  rbind(SBA_results[[3]][["imp"]][["SBA"]]) %>%
+  slice(-3, -5) %>%
+  rbind(SBA_results[[4]][["imp"]][["SBA"]]) %>%
+  slice(-4, -6) %>%
+  rbind(SBA_results[[5]][["imp"]][["SBA"]]) %>%
+  slice(-5, -7) %>%
+  rbind(SBA_results[[6]][["imp"]][["SBA"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(SBA_results[[7]][["imp"]][["SBA"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(SBA_results[[8]][["imp"]][["SBA"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(SBA_results[[9]][["imp"]][["SBA"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(SBA_results[[10]][["imp"]][["SBA"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(SBA_results[[11]][["imp"]][["SBA"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(SBA_results[[12]][["imp"]][["SBA"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(SBA_results[[13]][["imp"]][["SBA"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(SBA_results[[14]][["imp"]][["SBA"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(SBA_results[[15]][["imp"]][["SBA"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(SBA_results[[16]][["imp"]][["SBA"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(SBA_results[[17]][["imp"]][["SBA"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(SBA_results[[18]][["imp"]][["SBA"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(SBA_results[[19]][["imp"]][["SBA"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(SBA_results[[20]][["imp"]][["SBA"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(SBA_results[[21]][["imp"]][["SBA"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(SBA_results[[22]][["imp"]][["SBA"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(SBA_results[[23]][["imp"]][["SBA"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(SBA_results[[24]][["imp"]][["SBA"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(SBA_results[[25]][["imp"]][["SBA"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(SBA_results[[26]][["imp"]][["SBA"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(SBA_results[[27]][["imp"]][["SBA"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(SBA_results[[28]][["imp"]][["SBA"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(SBA_results[[29]][["imp"]][["SBA"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(SBA_results[[30]][["imp"]][["SBA"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(SBA_results[[31]][["imp"]][["SBA"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(SBA_results[[32]][["imp"]][["SBA"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(SBA_results[[33]][["imp"]][["SBA"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(SBA_results[[34]][["imp"]][["SBA"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(SBA_results[[35]][["imp"]][["SBA"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(SBA_results[[36]][["imp"]][["SBA"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(SBA_results[[37]][["imp"]][["SBA"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(SBA_results[[38]][["imp"]][["SBA"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(SBA_results[[39]][["imp"]][["SBA"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(SBA_results[[40]][["imp"]][["SBA"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(SBA_results[[41]][["imp"]][["SBA"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(SBA_results[[42]][["imp"]][["SBA"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(SBA_results[[43]][["imp"]][["SBA"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(SBA_results[[45]][["imp"]][["SBA"]]) %>%
+  slice(-44) %>%
+  rbind(SBA_results[[46]][["imp"]][["SBA"]]) %>%
+  slice(-46, -47) %>%
+  rbind(SBA_results[[47]][["imp"]][["SBA"]]) %>%
+  slice(-47, -48) %>%
+  rbind(SBA_results[[48]][["imp"]][["SBA"]]) %>%
+  slice(-48, -49) %>%
+  rbind(SBA_results[[49]][["imp"]][["SBA"]]) %>%
+  slice(-49, -50) %>%
+  rbind(SBA_results[[50]][["imp"]][["SBA"]]) %>%
+  slice(-50, -51)
+
+SBA_results_df <- mutate(SBA_results_df, mean = rowMeans(SBA_results_df), 
+         se = rowSds(as.matrix(SBA_results_df)))
+
+#Save results to computer as .csv
+write.csv(SBA_results_df, "[filepath]/SBA-MICE-Results.csv")
+
+```
+
+**BA (PMM)**
+```{r, message=FALSE, warning=FALSE}
+
+#Now for the BA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 6] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = methods_string, pred = pred_matrix, seed = 2019)
+}
+BA_results <- lapply(1:length(df_mice$BA), mice_procedure)
+
+```
+
+**Organize results for BA and compute mean and variance**
+```{r}
+
+BA_results_df <- BA_results[[1]][["imp"]][["BA"]] %>%
+  slice(1:2) %>% 
+  rbind(BA_results[[3]][["imp"]][["BA"]]) %>%
+  slice(-3, -5) %>%
+  rbind(BA_results[[4]][["imp"]][["BA"]]) %>%
+  slice(-4, -6) %>%
+  rbind(BA_results[[5]][["imp"]][["BA"]]) %>%
+  slice(-5, -7) %>%
+  rbind(BA_results[[6]][["imp"]][["BA"]]) %>% 
+  slice(-6, -8) %>%
+  rbind(BA_results[[7]][["imp"]][["BA"]]) %>% 
+  slice(-7, -9) %>%
+  rbind(BA_results[[8]][["imp"]][["BA"]]) %>% 
+  slice(-8, -10) %>%
+  rbind(BA_results[[9]][["imp"]][["BA"]]) %>% 
+  slice(-9, -11) %>%
+  rbind(BA_results[[10]][["imp"]][["BA"]]) %>% 
+  slice(-10, -12) %>%
+  rbind(BA_results[[11]][["imp"]][["BA"]]) %>% 
+  slice(-11, -13) %>%
+  rbind(BA_results[[12]][["imp"]][["BA"]]) %>% 
+  slice(-12, -14) %>%
+  rbind(BA_results[[13]][["imp"]][["BA"]]) %>% 
+  slice(-13, -15) %>%
+  rbind(BA_results[[14]][["imp"]][["BA"]]) %>% 
+  slice(-14, -16) %>%
+  rbind(BA_results[[15]][["imp"]][["BA"]]) %>% 
+  slice(-15, -17) %>%
+  rbind(BA_results[[16]][["imp"]][["BA"]]) %>% 
+  slice(-16, -18) %>%
+  rbind(BA_results[[17]][["imp"]][["BA"]]) %>% 
+  slice(-17, -19) %>%
+  rbind(BA_results[[18]][["imp"]][["BA"]]) %>% 
+  slice(-18, -20) %>%
+  rbind(BA_results[[19]][["imp"]][["BA"]]) %>% 
+  slice(-19, -21) %>%
+  rbind(BA_results[[20]][["imp"]][["BA"]]) %>% 
+  slice(-20, -22) %>%
+  rbind(BA_results[[21]][["imp"]][["BA"]]) %>% 
+  slice(-21, -23) %>%
+  rbind(BA_results[[22]][["imp"]][["BA"]]) %>% 
+  slice(-22, -24) %>%
+  rbind(BA_results[[23]][["imp"]][["BA"]]) %>% 
+  slice(-23, -25) %>%
+  rbind(BA_results[[24]][["imp"]][["BA"]]) %>% 
+  slice(-24, -26) %>%
+  rbind(BA_results[[25]][["imp"]][["BA"]]) %>% 
+  slice(-25, -27) %>%
+  rbind(BA_results[[26]][["imp"]][["BA"]]) %>% 
+  slice(-26, -28) %>%
+  rbind(BA_results[[27]][["imp"]][["BA"]]) %>% 
+  slice(-27, -29) %>%
+  rbind(BA_results[[28]][["imp"]][["BA"]]) %>% 
+  slice(-28, -30) %>%
+  rbind(BA_results[[29]][["imp"]][["BA"]]) %>% 
+  slice(-29, -31) %>%
+  rbind(BA_results[[30]][["imp"]][["BA"]]) %>% 
+  slice(-30, -32) %>%
+  rbind(BA_results[[31]][["imp"]][["BA"]]) %>% 
+  slice(-31, -33) %>%
+  rbind(BA_results[[32]][["imp"]][["BA"]]) %>% 
+  slice(-32, -34) %>%
+  rbind(BA_results[[33]][["imp"]][["BA"]]) %>% 
+  slice(-33, -35) %>%
+  rbind(BA_results[[34]][["imp"]][["BA"]]) %>% 
+  slice(-34, -36) %>%
+  rbind(BA_results[[35]][["imp"]][["BA"]]) %>% 
+  slice(-35, -37) %>%
+  rbind(BA_results[[36]][["imp"]][["BA"]]) %>% 
+  slice(-36, -38) %>%
+  rbind(BA_results[[37]][["imp"]][["BA"]]) %>% 
+  slice(-37, -39) %>%
+  rbind(BA_results[[38]][["imp"]][["BA"]]) %>% 
+  slice(-38, -40) %>%
+  rbind(BA_results[[39]][["imp"]][["BA"]]) %>% 
+  slice(-39, -41) %>%
+  rbind(BA_results[[40]][["imp"]][["BA"]]) %>% 
+  slice(-40, -42) %>%
+  rbind(BA_results[[41]][["imp"]][["BA"]]) %>% 
+  slice(-41, -43) %>%
+  rbind(BA_results[[42]][["imp"]][["BA"]]) %>% 
+  slice(-42, -44) %>%
+  rbind(BA_results[[43]][["imp"]][["BA"]]) %>% 
+  slice(-43, -45) %>%
+  rbind(BA_results[[45]][["imp"]][["BA"]]) %>%
+  slice(-44) %>%
+  rbind(BA_results[[46]][["imp"]][["BA"]]) %>%
+  slice(-46, -47) %>%
+  rbind(BA_results[[47]][["imp"]][["BA"]]) %>%
+  slice(-47, -48) %>%
+  rbind(BA_results[[48]][["imp"]][["BA"]]) %>%
+  slice(-48, -49) %>%
+  rbind(BA_results[[49]][["imp"]][["BA"]]) %>%
+  slice(-49, -50) %>%
+  rbind(BA_results[[50]][["imp"]][["BA"]]) %>%
+  slice(-50, -51)
+
+BA_results_df <- mutate(BA_results_df, mean = rowMeans(BA_results_df), 
+         se = rowSds(as.matrix(BA_results_df)))
+
+#Save results to computer as a .csv
+write.csv(BA_results_df, "[filepath]/BA-MICE-Results.csv")
+
+```
+
+**AINA**
+```{r}
+
+#Now for the AINA variable:
+mice_procedure <- function(x){
+	df_mice1 <- df_mice
+	df_mice1[x, 11] <- NA
+	mice(df_mice1, m = 100, maxit = 15, visitSequence = vis, method = methods_string, pred = pred_matrix, seed = 2019)
+}
+AINA_results <- lapply(1:length(df_mice$AINA), mice_procedure)
+
+```
+
+**Organize results for API and compute mean and variance**
+```{r}
+
+AINA_results_df <- AINA_results[[2]][["imp"]][["AINA"]] %>%
+  slice(1:2) %>% 
+  rbind(AINA_results[[3]][["imp"]][["AINA"]]) %>%
+  slice(1:2, 4) %>% 
+  rbind(AINA_results[[23]][["imp"]][["AINA"]]) %>%
+  slice(1:3, 5:24) %>% 
+  rbind(AINA_results[[26]][["imp"]][["AINA"]]) %>%
+  slice(1:23, 44:46) %>% 
+  rbind(AINA_results[[31]][["imp"]][["AINA"]]) %>%
+  slice(1:26, 49:53) %>% 
+  rbind(AINA_results[[33]][["imp"]][["AINA"]]) %>%
+  slice(1:31, 58:59) %>% 
+  rbind(AINA_results[[34]][["imp"]][["AINA"]])  %>%
+  slice(1:33, 61) %>% 
+  rbind(AINA_results[[36]][["imp"]][["AINA"]]) %>%
+  slice(1:34, 62:63) %>% 
+  rbind(AINA_results[[41]][["imp"]][["AINA"]]) %>%
+  slice(1:36, 65:69) %>% 
+  rbind(AINA_results[[44]][["imp"]][["AINA"]]) %>%
+  slice(1:41, 74:76) %>% 
+  rbind(AINA_results[[47]][["imp"]][["AINA"]]) %>%
+  slice(1:44, 79:81) %>% 
+  rbind(AINA_results[[49]][["imp"]][["AINA"]]) %>%
+  slice(1:47, 84:85) %>% 
+  rbind(AINA_results[[50]][["imp"]][["AINA"]]) %>%
+  slice(1:49, 87)
+        
+AINA_results_df <- mutate(AINA_results_df, mean = rowMeans(AINA_results_df), 
+         se = rowSds(as.matrix(AINA_results_df)))
+
+#Save results to computer as a .csv
+write.csv(AINA_results_df, "[filepath]/AINA-MICE-Results.csv")
+
+```
+
+### Re-check plausibility of MICE-based estimates of mean subgroup achievement
+
+(this time just for SBA, BA and AINA)
+
+**Again, free up memory**
+```{r warning=FALSE, message=FALSE}
+rm(list = ls())
+```
+
+**Import results for the three subgroups imputed with PMM**
+```{r warning=FALSE, message=FALSE}
+
+SBA_results_df <- read_csv("[filepath]/SBA-MICE-Results.csv")
+BA_results_df <- read_csv("[filepath]/BA-MICE-Results.csv")
+AINA_results_df <- read_csv("[filepath]/AINA-MICE-Results.csv")
+
+```
+
+**Wrangle target values for the three subgroups imputed with PMM**
+
+*Save state abbreviations to an object called "State".*
+```{r, warning=FALSE, message=FALSE}
+
+State <- read_csv("[filepath]/Subgroups of Interest/2+.csv")
+
+State <- State[,1]
+
+```
+
+Column bind "State" to each of the subgroup results data frames
+
+```{r, warning=FALSE, message=FALSE}
+
+SBA_results_df <- cbind(State, SBA_results_df)
+BA_results_df <- cbind(State, BA_results_df)
+AINA_results_df <- cbind(State, AINA_results_df)
+
+```
+
+Keep only State, mean and se variables
+
+```{r, warning=FALSE, message=FALSE}
+
+SBA_results_df <- SBA_results_df %>%
+  select("State", "mean", "se")
+BA_results_df <- BA_results_df %>%
+  select("State", "mean", "se")
+AINA_results_df <- AINA_results_df %>%
+  select("State", "mean", "se")
+
+```
+
+Keep only target values
+```{r, warning=FALSE, message=FALSE}
+
+#SBA
+SBA_results_df[2,2:3] <- NA
+SBA_results_df[44,2:3] <- NA
+
+#BA
+BA_results_df[2,2:3] <- NA
+BA_results_df[44,2:3] <- NA
+
+#AINA
+AINA_results_df[1,2:3] <- NA
+AINA_results_df[4:22,2:3] <- NA
+AINA_results_df[24:25,2:3] <- NA
+AINA_results_df[27:30,2:3] <- NA
+AINA_results_df[32,2:3] <- NA
+AINA_results_df[35,2:3] <- NA
+AINA_results_df[37:40,2:3] <- NA
+AINA_results_df[42:43,2:3] <- NA
+AINA_results_df[45:46,2:3] <- NA
+AINA_results_df[48,2:3] <- NA
+
+```
+
+**SBA**
+```{r warning=FALSE, message=FALSE}
+
+SBA_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 294.2487, color="red") + 
+  geom_hline(yintercept = 272.0388, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+The predicted values for the SBA subgroup are now all in-bound.
+
+**BA**
+```{r warning=FALSE, message=FALSE}
+
+BA_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 309.5, color="red") + 
+  geom_hline(yintercept = 276.1, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+The predicted values for the BA subgroup are now all in-bound.
+
+**AINA**
+```{r warning=FALSE, message=FALSE}
+
+AINA_results_df %>%
+  ggplot(., aes(x=1, y=mean)) + 
+  geom_dotplot(binwidth = 1, binaxis = "y", stackdir = "center") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  geom_hline(yintercept = 266.865, color="red") + 
+  geom_hline(yintercept = 251.305, color="red") + 
+  ylab("Score") +
+  theme(text=element_text(size=14,  family="serif"))
+
+```
+
+The predicted values for the AINA subgroup are now all in-bound.
+
+###Wrangle final predicted values and their variance estimate into one data file
+
+Clear environment
+```{r warning=FALSE, message=FALSE}
+rm(list = ls())
+```
+
+Import results from MICE procedure
+```{r warning=FALSE, message=FALSE}
+
+NHS_results_df <- read_csv("[filepath]/NHS-MICE-Results.csv")
+HS_results_df <- read_csv("[filepath]/HS-MICE-Results.csv")
+SBA_results_df <- read_csv("[filepath]/SBA-MICE-Results.csv")
+BA_results_df <- read_csv("[filepath]/BA-MICE-Results.csv")
+B_results_df <- read_csv("[filepath]/B-MICE-Results.csv")
+H_results_df <- read_csv("[filepath]/H-MICE-Results.csv")
+API_results_df <- read_csv("[filepath]/API-MICE-Results.csv")
+AINA_results_df <- read_csv("[filepath]/AINA-MICE-Results.csv")
+TP_results_df <- read_csv("[filepath]/TP-MICE-Results.csv")
+EL_results_df <- read_csv("[filepath]/EL-MICE-Results.csv")
+
+```
+
+
+Save state abbreviations to an object called "State"
+```{r, warning=FALSE, message=FALSE}
+
+State <- read_csv("[filepath]/Subgroups of Interest/2+.csv")
+
+State <- State[,1]
+
+```
+
+Column bind "State" to each of the subgroup results data frames
+```{r, warning=FALSE, message=FALSE}
+
+NHS_results_df <- cbind(State, NHS_results_df)
+HS_results_df <- cbind(State, HS_results_df)
+SBA_results_df <- cbind(State, SBA_results_df)
+BA_results_df <- cbind(State, BA_results_df)
+B_results_df <- cbind(State, B_results_df)
+H_results_df <- cbind(State, H_results_df)
+API_results_df <- cbind(State, API_results_df)
+AINA_results_df <- cbind(State, AINA_results_df)
+TP_results_df <- cbind(State, TP_results_df)
+EL_results_df <- cbind(State, EL_results_df)
+
+```
+
+Keep only State, mean and se variables
+```{r, warning=FALSE, message=FALSE}
+
+NHS_results_df <- NHS_results_df %>%
+  select("State", "mean", "se")
+HS_results_df <- HS_results_df %>%
+  select("State", "mean", "se")
+SBA_results_df <- SBA_results_df %>%
+  select("State", "mean", "se")
+BA_results_df <- BA_results_df %>%
+  select("State", "mean", "se")
+B_results_df <- B_results_df %>%
+  select("State", "mean", "se")
+H_results_df <- H_results_df %>%
+  select("State", "mean", "se")
+API_results_df <- API_results_df %>%
+  select("State", "mean", "se")
+AINA_results_df <- AINA_results_df %>%
+  select("State", "mean", "se")
+TP_results_df <- TP_results_df %>%
+  select("State", "mean", "se")
+EL_results_df <- EL_results_df %>%
+  select("State", "mean", "se")
+
+
+```
+
+Keep only target values
+```{r, warning=FALSE, message=FALSE}
+#NHS
+NHS_results_df[2,2:3] <- NA
+NHS_results_df[44,2:3] <- NA
+
+#HS
+HS_results_df[2,2:3] <- NA
+HS_results_df[44,2:3] <- NA
+
+#SBA
+SBA_results_df[2,2:3] <- NA
+SBA_results_df[44,2:3] <- NA
+
+#BA
+BA_results_df[2,2:3] <- NA
+BA_results_df[44,2:3] <- NA
+
+#B
+B_results_df[11:12,2:3] <- NA
+B_results_df[19,2:3] <- NA
+B_results_df[26,2:3] <- NA
+B_results_df[29,2:3] <- NA
+B_results_df[31,2:3] <- NA
+B_results_df[37,2:3] <- NA
+B_results_df[41,2:3] <- NA
+B_results_df[44:45,2:3] <- NA
+B_results_df[50,2:3] <- NA
+
+#H
+H_results_df[19,2:3] <- NA
+H_results_df[45,2:3] <- NA
+H_results_df[48,2:3] <- NA
+
+#API
+API_results_df[1,2:3] <- NA
+API_results_df[4,2:3] <- NA
+API_results_df[12,2:3] <- NA
+API_results_df[14,2:3] <- NA
+API_results_df[18:19,2:3] <- NA
+API_results_df[24:27,2:3] <- NA
+API_results_df[31,2:3] <- NA
+API_results_df[34,2:3] <- NA
+API_results_df[36,2:3] <- NA
+API_results_df[40:42,2:3] <- NA
+API_results_df[44:45,2:3] <- NA
+API_results_df[48,2:3] <- NA
+API_results_df[50,2:3] <- NA
+
+#AINA
+AINA_results_df[1,2:3] <- NA
+AINA_results_df[4:22,2:3] <- NA
+AINA_results_df[24:25,2:3] <- NA
+AINA_results_df[27:30,2:3] <- NA
+AINA_results_df[32,2:3] <- NA
+AINA_results_df[35,2:3] <- NA
+AINA_results_df[37:40,2:3] <- NA
+AINA_results_df[42:43,2:3] <- NA
+AINA_results_df[45:46,2:3] <- NA
+AINA_results_df[48,2:3] <- NA
+
+#TP
+TP_results_df[1,2:3] <- NA
+TP_results_df[3:4,2:3] <- NA
+TP_results_df[7:8,2:3] <- NA
+TP_results_df[12:13,2:3] <- NA
+TP_results_df[18:19,2:3] <- NA
+TP_results_df[21:22,2:3] <- NA
+TP_results_df[24:25,2:3] <- NA
+TP_results_df[29:32,2:3] <- NA
+TP_results_df[34,2:3] <- NA
+TP_results_df[40:42,2:3] <- NA
+TP_results_df[44:45,2:3] <- NA
+TP_results_df[48:50,2:3] <- NA
+
+#EL
+EL_results_df[1,2:3] <- NA
+EL_results_df[8,2:3] <- NA
+EL_results_df[12,2:3] <- NA
+EL_results_df[17:19,2:3] <- NA
+EL_results_df[24:27,2:3] <- NA
+EL_results_df[29:30,2:3] <- NA
+EL_results_df[34,2:3] <- NA
+EL_results_df[37,2:3] <- NA
+EL_results_df[41:42,2:3] <- NA
+EL_results_df[45,2:3] <- NA
+EL_results_df[48,2:3] <- NA
+EL_results_df[50,2:3] <- NA
+```
+
+Save these predicted means and their standard errors
+```{r message=FALSe, warning=FALSE}
+
+write.csv(NHS_results_df, "[filepath]/NHS-MICE-ESTIMATES.csv")
+write.csv(HS_results_df, "[filepath]/HS-MICE-ESTIMATES.csv")
+write.csv(SBA_results_df, "[filepath]/SBA-MICE-ESTIMATES.csv")
+write.csv(BA_results_df, "[filepath]/BA-MICE-ESTIMATES.csv")
+write.csv(B_results_df, "[filepath]/B-MICE-ESTIMATES.csv")
+write.csv(H_results_df, "[filepath]/H-MICE-ESTIMATES.csv")
+write.csv(API_results_df, "[filepath]/API-MICE-ESTIMATES.csv")
+write.csv(AINA_results_df, "[filepath]/AINA-MICE-ESTIMATES.csv")
+write.csv(TP_results_df, "[filepath]/TP-MICE-ESTIMATES.csv")
+write.csv(EL_results_df, "[filepath]/EL-MICE-ESTIMATES.csv")
+
+```
+
+### Calculate wMAE for MICE technique
+
+**Again, free up memory**
+```{r warning=FALSE, message=FALSE}
+rm(list = ls())
+```
+
+**Define a wMAE function**
+```{r warning=FALSE, message=FALSE}
+
+wmae <- function(x){
+  w_abs_errors <- abs(x[,2] - x[,4])/x[,3]
+  mean(w_abs_errors[,1])
+}
+
+```
+
+**By subgroup**
+
+NHS
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+NHS_predicted <- read_csv("[filepath]/NHS-MICE-ESTIMATES.csv")
+NHS_predicted <- NHS_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+NHS_observed <- read_csv("[filepath]/Subgroups of Interest/NHS.csv")
+NHS_observed <- NHS_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+NHS <- inner_join(NHS_observed, NHS_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(NHS)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make NHS tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(NHS$State, source, NHS$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(NHS$State, source, NHS$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+NHS_tidy <- rbind(part1, part2)
+
+NHS_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+NHS_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+NHS_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+
+HS
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+HS_predicted <- read_csv("[filepath]/HS-MICE-ESTIMATES.csv")
+HS_predicted <- HS_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+HS_observed <- read_csv("[filepath]/Subgroups of Interest/HS.csv")
+HS_observed <- HS_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+HS <- inner_join(HS_observed, HS_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(HS)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make HS tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(HS$State, source, HS$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(HS$State, source, HS$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+HS_tidy <- rbind(part1, part2)
+
+HS_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+HS_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+HS_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+SBA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+SBA_predicted <- read_csv("[filepath]/SBA-MICE-ESTIMATES.csv")
+SBA_predicted <- SBA_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+SBA_observed <- read_csv("[filepath]/Subgroups of Interest/SBA.csv")
+SBA_observed <- SBA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+SBA <- inner_join(SBA_observed, SBA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(SBA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make SBA tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(SBA$State, source, SBA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(SBA$State, source, SBA$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+SBA_tidy <- rbind(part1, part2)
+
+SBA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+SBA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+SBA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+BA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+BA_predicted <- read_csv("[filepath]/BA-MICE-ESTIMATES.csv")
+BA_predicted <- BA_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+BA_observed <- read_csv("[filepath]/Subgroups of Interest/BA.csv")
+BA_observed <- BA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+BA <- inner_join(BA_observed, BA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(BA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make BA tidy
+
+source <- rep(c("NAEP"), 48)
+source <- as.data.frame(source)
+part1 <- cbind(BA$State, source, BA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 48)
+source <- as.data.frame(source)
+part2 <- cbind(BA$State, source, BA$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+BA_tidy <- rbind(part1, part2)
+
+BA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+BA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+BA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+B
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+B_predicted <- read_csv("[filepath]/B-MICE-ESTIMATES.csv")
+B_predicted <- B_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+B_observed <- read_csv("[filepath]/Subgroups of Interest/B.csv")
+B_observed <- B_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+B <- inner_join(B_observed, B_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(B)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r message=FALSE, warning=FALSE}
+
+#Make B tidy
+
+source <- rep(c("NAEP"), 39)
+source <- as.data.frame(source)
+part1 <- cbind(B$State, source, B$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 39)
+source <- as.data.frame(source)
+part2 <- cbind(B$State, source, B$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+B_tidy <- rbind(part1, part2)
+
+B_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+B_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+B_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+H
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+H_predicted <- read_csv("[filepath]/H-MICE-ESTIMATES.csv")
+H_predicted <- H_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+H_observed <- read_csv("[filepath]/Subgroups of Interest/H.csv")
+H_observed <- H_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+H <- inner_join(H_observed, H_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(H)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make H tidy
+
+source <- rep(c("NAEP"), 47)
+source <- as.data.frame(source)
+part1 <- cbind(H$State, source, H$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 47)
+source <- as.data.frame(source)
+part2 <- cbind(H$State, source, H$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+H_tidy <- rbind(part1, part2)
+
+H_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+H_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+H_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+API
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+API_predicted <- read_csv("[filepath]/API-MICE-ESTIMATES.csv")
+API_predicted <- API_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+API_observed <- read_csv("[filepath]/Subgroups of Interest/API.csv")
+API_observed <- API_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+API <- inner_join(API_observed, API_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(API)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make API tidy
+
+source <- rep(c("NAEP"), 30)
+source <- as.data.frame(source)
+part1 <- cbind(API$State, source, API$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 30)
+source <- as.data.frame(source)
+part2 <- cbind(API$State, source, API$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+API_tidy <- rbind(part1, part2)
+
+API_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+API_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+API_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+AINA
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+AINA_predicted <- read_csv("[filepath]/AINA-MICE-ESTIMATES.csv")
+AINA_predicted <- AINA_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+AINA_observed <- read_csv("[filepath]/Subgroups of Interest/AINA.csv")
+AINA_observed <- AINA_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+AINA <- inner_join(AINA_observed, AINA_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(AINA)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make AINA tidy
+
+source <- rep(c("NAEP"), 13)
+source <- as.data.frame(source)
+part1 <- cbind(AINA$State, source, AINA$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 13)
+source <- as.data.frame(source)
+part2 <- cbind(AINA$State, source, AINA$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+AINA_tidy <- rbind(part1, part2)
+
+AINA_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+AINA_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+AINA_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+TP
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+TP_predicted <- read_csv("[filepath]/TP-MICE-ESTIMATES.csv")
+TP_predicted <- TP_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+TP_observed <- read_csv("[filepath]/Subgroups of Interest/2+.csv")
+TP_observed <- TP_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+TP <- inner_join(TP_observed, TP_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(TP)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make TP tidy
+
+source <- rep(c("NAEP"), 24)
+source <- as.data.frame(source)
+part1 <- cbind(TP$State, source, TP$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 24)
+source <- as.data.frame(source)
+part2 <- cbind(TP$State, source, TP$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+TP_tidy <- rbind(part1, part2)
+
+TP_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+TP_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+TP_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+EL
+```{r message=FALSE, warning=FALSE}
+
+#Import/Wrangle predicted and observed data
+EL_predicted <- read_csv("[filepath]/EL-MICE-ESTIMATES.csv")
+EL_predicted <- EL_predicted %>%
+  select(-"X1") %>%
+  rename("MICE_mean" = mean) %>%
+  rename("MICE_se" = se)
+EL_observed <- read_csv("[filepath]/Subgroups of Interest/EL.csv")
+EL_observed <- EL_observed %>%
+  rename("NAEP_mean" = Mean) %>%
+  rename("NAEP_se" = SE)
+EL <- inner_join(EL_observed, EL_predicted, by = "State") %>%
+  filter(NAEP_mean != "NA")
+                         
+wmae(EL)
+
+```
+
+Create visuals and compute descriptive statistics to compare distributions 
+```{r, warning=FALSE, message=FALSE}
+
+#Make EL tidy
+
+source <- rep(c("NAEP"), 31)
+source <- as.data.frame(source)
+part1 <- cbind(EL$State, source, EL$NAEP_mean)
+names(part1) <- c("State", "method", "mean_estimate")
+
+source <- rep(c("MICE"), 31)
+source <- as.data.frame(source)
+part2 <- cbind(EL$State, source, EL$MICE_mean)
+names(part2) <- c("State", "method", "mean_estimate")
+
+EL_tidy <- rbind(part1, part2)
+
+EL_tidy %>%
+  ggplot(aes(method, mean_estimate, col=method)) +
+  geom_boxplot() + 
+  geom_point(alpha = 0.5)
+
+EL_tidy %>%
+  ggplot(aes(mean_estimate, col=method)) +
+  geom_histogram() + 
+  facet_wrap(method~., ncol=1)
+
+EL_tidy %>% 
+  group_by(method) %>%
+  summarize(mean = mean(mean_estimate),
+            median = median(mean_estimate),
+            Std_Dev = sd(mean_estimate),
+            min = min(mean_estimate),
+            max = max(mean_estimate))
+
+
+```
+
+**Overall**
+```{r message=FALSE, warning=FALSE}
+
+#Row bind subgroup datasets into an "overall dataset"
+overall <- rbind(NHS, HS, SBA, BA, B, H, API, AINA, TP, EL)
+
+#Calculate wMAE for MICE across subgroups                         
+wmae(overall)
+
+```
+
+### Calculate Coverage for MICE
+
+First, add the median of the NAEP-reported state-level standard deviations to each respective subgroup's data set (this permits calculation of the b-statistic).
+
+```{r message=FALSE, warning=FALSE}
+
+NHS$median_sd <- 31.5
+HS$median_sd <- 32.6
+SBA$median_sd <- 30.6
+BA$median_sd <- 34.4
+B$median_sd <- 33.4
+H$median_sd <- 34.0
+API$median_sd <- 38.1
+AINA$median_sd <- 35.4
+TP$median_sd <- 35.2
+EL$median_sd <- 33.3
+
+```
+
+**By subgroup**
+
+NHS
+```{r message=FALSE, warning=FALSE}
+
+NHS$b_statisic <- abs(NHS$NAEP_mean-NHS$MICE_mean)/NHS$median_sd
+mean(NHS$b_statisic <= 0.20)
+
+```
+NHS-visual
+```{r message=FALSE, warning=FALSE}
+
+NHS$lowerbound <- NHS$NAEP_mean - 0.2*NHS$median_sd
+NHS$upperbound <- NHS$NAEP_mean + 0.2*NHS$median_sd
+
+NHS <- NHS %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = NHS, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = NHS, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+
+
+```
+
+HS
+```{r message=FALSE, warning=FALSE}
+
+HS$b_statisic <- abs(HS$NAEP_mean-HS$MICE_mean)/HS$median_sd
+mean(HS$b_statisic <= 0.20)
+
+
+```
+
+HS-visual
+```{r message=FALSE, warning=FALSE}
+
+HS$lowerbound <- HS$NAEP_mean - 0.2*HS$median_sd
+HS$upperbound <- HS$NAEP_mean + 0.2*HS$median_sd
+
+HS <- HS %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = HS, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = HS, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+```
+
+
+SBA
+```{r message=FALSE, warning=FALSE}
+
+SBA$b_statisic <- abs(SBA$NAEP_mean-SBA$MICE_mean)/SBA$median_sd
+mean(SBA$b_statisic <= 0.20)
+
+```
+
+SBA-visual
+```{r message=FALSE, warning=FALSE}
+
+SBA$lowerbound <- SBA$NAEP_mean - 0.2*SBA$median_sd
+SBA$upperbound <- SBA$NAEP_mean + 0.2*SBA$median_sd
+
+SBA <- SBA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = SBA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = SBA, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+BA
+```{r message=FALSE, warning=FALSE}
+
+BA$b_statisic <- abs(BA$NAEP_mean-BA$MICE_mean)/BA$median_sd
+mean(BA$b_statisic <= 0.20)
+
+```
+
+BA-visual
+```{r message=FALSE, warning=FALSE}
+
+BA$lowerbound <- BA$NAEP_mean - 0.2*BA$median_sd
+BA$upperbound <- BA$NAEP_mean + 0.2*BA$median_sd
+
+BA <- BA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = BA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = BA, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+B
+```{r message=FALSE, warning=FALSE}
+
+B$b_statisic <- abs(B$NAEP_mean-B$MICE_mean)/B$median_sd
+mean(B$b_statisic <= 0.20)
+
+```
+
+B-visual
+```{r message=FALSE, warning=FALSE}
+
+B$lowerbound <- B$NAEP_mean - 0.2*B$median_sd
+B$upperbound <- B$NAEP_mean + 0.2*B$median_sd
+
+B <- B %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = B, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = B, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+H
+```{r message=FALSE, warning=FALSE}
+
+H$b_statisic <- abs(H$NAEP_mean-H$MICE_mean)/H$median_sd
+mean(H$b_statisic <= 0.20)
+
+```
+
+H-visual
+```{r message=FALSE, warning=FALSE}
+
+H$lowerbound <- H$NAEP_mean - 0.2*H$median_sd
+H$upperbound <- H$NAEP_mean + 0.2*H$median_sd
+
+H <- H %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = H, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = H, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+API
+```{r message=FALSE, warning=FALSE}
+
+API$b_statisic <- abs(API$NAEP_mean-API$MICE_mean)/API$median_sd
+mean(API$b_statisic <= 0.20)
+
+```
+
+API-visual
+```{r message=FALSE, warning=FALSE}
+
+API$lowerbound <- API$NAEP_mean - 0.2*API$median_sd
+API$upperbound <- API$NAEP_mean + 0.2*API$median_sd
+
+API <- API %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = API, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = API, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+AINA
+```{r message=FALSE, warning=FALSE}
+
+AINA$b_statisic <- abs(AINA$NAEP_mean-AINA$MICE_mean)/AINA$median_sd
+mean(AINA$b_statisic <= 0.20)
+
+```
+
+AINA-visual
+```{r message=FALSE, warning=FALSE}
+
+AINA$lowerbound <- AINA$NAEP_mean - 0.2*AINA$median_sd
+AINA$upperbound <- AINA$NAEP_mean + 0.2*AINA$median_sd
+
+AINA <- AINA %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = AINA, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = AINA, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+
+TP (2+)
+```{r message=FALSE, warning=FALSE}
+
+TP$b_statisic <- abs(TP$NAEP_mean-TP$MICE_mean)/TP$median_sd
+mean(TP$b_statisic <= 0.20)
+
+```
+
+TP-visual
+```{r message=FALSE, warning=FALSE}
+
+TP$lowerbound <- TP$NAEP_mean - 0.2*TP$median_sd
+TP$upperbound <- TP$NAEP_mean + 0.2*TP$median_sd
+
+TP <- TP %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = TP, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = TP, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+EL
+```{r message=FALSE, warning=FALSE}
+
+EL$b_statisic <- abs(EL$NAEP_mean-EL$MICE_mean)/EL$median_sd
+mean(EL$b_statisic <= 0.20)
+
+```
+
+EL-visual
+```{r message=FALSE, warning=FALSE}
+
+EL$lowerbound <- EL$NAEP_mean - 0.2*EL$median_sd
+EL$upperbound <- EL$NAEP_mean + 0.2*EL$median_sd
+
+EL <- EL %>%
+  mutate(State = fct_reorder(State, desc(NAEP_mean)))
+
+ggplot() +
+  geom_errorbar(data = EL, mapping=aes(xmin=lowerbound, xmax=upperbound, y=State,
+                col = "target interval")) +    
+  geom_point(data = EL, aes(MICE_mean, State, col = "MICE prediction"),size=1.5) +
+  theme(text=element_text(size=8,  family="serif")) +
+  xlab("NAEP Score") 
+
+```
+
+**Overall**
+
+Row bind datasets
+```{r message=FALSE, warning=FALSE}
+
+#Row bind subgroup datasets into an "overall dataset"
+overall <- rbind(NHS, HS, SBA, BA, B, H, API, AINA, TP, EL)
+
+#Calculate coverage across groups
+mean(overall$b_statisic <= 0.20)
+
+```
+
